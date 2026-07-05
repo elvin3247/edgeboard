@@ -185,6 +185,38 @@ ol.steps li{margin-bottom:6px}
 
 footer{border-top:1px solid var(--line);padding:22px 0 34px;margin-top:20px}
 footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--chalk-dim)}
+
+/* prop board: game cards + rating system */
+.sport-row{display:flex;align-items:center;gap:14px;margin:18px 0 4px}
+.sport-pill{font-family:var(--disp);font-weight:700;font-size:18px;letter-spacing:.06em;text-transform:uppercase;padding:7px 20px;border-radius:99px;border:1px solid var(--line);background:var(--booth);color:var(--chalk-dim);cursor:default}
+.sport-pill.on{color:var(--amber);border-color:rgba(255,176,32,.55);background:var(--amber-soft)}
+.gcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;margin-top:6px}
+@media(max-width:520px){.gcards{grid-template-columns:1fr}}
+.gcard{background:var(--booth);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.gcard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.gcard-teams{font-family:var(--disp);font-weight:600;font-size:19px;letter-spacing:.02em;text-transform:uppercase;line-height:1.2}
+.gcard-meta{font-family:var(--mono);font-size:11.5px;color:var(--chalk-dim);margin-top:3px}
+.gcard-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.gcard-body{margin-top:4px}
+.gcard-body:has(*){border-top:1px dashed var(--line);margin-top:12px;padding-top:4px}
+.gcard-weather{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 2px;color:var(--chalk-dim)}
+.gcard .table-scroll table{font-size:12.5px}
+.gcard td,.gcard th{padding:7px 9px}
+.rate{display:inline-block;font-family:var(--mono);font-weight:600;font-size:12px;letter-spacing:.02em;padding:3px 9px;border-radius:6px;border:1px solid transparent;background:none;cursor:default}
+button.rate{cursor:pointer}
+.rate.r-neu{color:var(--chalk-dim);border-color:var(--line)}
+.rate.r-pos1{color:var(--up);border-color:rgba(79,201,126,.35);background:rgba(79,201,126,.08)}
+.rate.r-pos2{color:var(--up);border-color:rgba(79,201,126,.55);background:rgba(79,201,126,.16)}
+.rate.r-pos3{color:#0e1a13;border-color:var(--up);background:var(--up)}
+.rate.r-neg1{color:var(--down);border-color:rgba(229,72,77,.35);background:rgba(229,72,77,.08)}
+.rate.r-neg2{color:var(--down);border-color:rgba(229,72,77,.55);background:rgba(229,72,77,.16)}
+.rate.r-neg3{color:#fff;border-color:var(--down);background:var(--down)}
+.detail-row td{background:var(--field)}
+.detail-grid{display:flex;flex-wrap:wrap;gap:6px 18px;font-family:var(--mono);font-size:11.5px;color:var(--chalk-dim);padding:4px 0}
+.detail-grid b{color:var(--amber);font-weight:600;margin-right:4px}
+.score-progress{position:relative;height:22px;background:var(--booth-2);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:10px 0 4px}
+.score-bar{position:absolute;inset:0 auto 0 0;background:var(--amber-soft);border-right:2px solid var(--amber);transition:width .3s}
+.score-progress span{position:relative;font-family:var(--mono);font-size:11px;color:var(--chalk-dim);line-height:22px;padding-left:10px}
 </style>
 </head>
 <body>
@@ -199,6 +231,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
       <button id="tab-board" class="active" onclick="showView('board')">Live board</button>
       <button id="tab-futures" onclick="showView('futures')">Futures</button>
       <button id="tab-analyzer" onclick="showView('analyzer')">Analyzer</button>
+      <button id="tab-games" onclick="showView('games')">Games</button>
       <button id="tab-log" onclick="showView('log')">Bet log</button>
       <button id="tab-setup" onclick="showView('setup')">Setup</button>
     </nav>
@@ -207,29 +240,47 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
 
 <main class="wrap">
 
-  <!-- ================= LIVE BOARD ================= -->
+  <!-- ================= PROP BOARD ================= -->
   <section id="view-board" class="view active">
-    <div class="eyebrow">Live lines · The Odds API · weather · Open-Meteo</div>
+    <div class="eyebrow">Prop board · lines from The Odds API · usage data from nflverse</div>
     <h1>Find the soft number</h1>
-    <p class="sub">Pull player props across the major US books. EdgeBoard shows the consensus line, the best price each side, line movement since you first saw the number, game weather, and the model's own projection when you score the board.</p>
+    <p class="sub">Pick the season, pick a week, and every game pops up as a card. Open team props or player props inside any game and each line gets a single rating: green positive means the best available price gives you an edge of that size, red negative means the book has you. Ratings blend the model's projection, the player's real hit history, and the value of the best price on the board, anchored to the market's own opinion.</p>
 
     <div id="board-key-warning" style="margin-top:18px"></div>
 
-    <div class="board-controls">
-      <div class="field">
-        <label for="game-select">Game</label>
-        <select id="game-select"><option value="">Load games first</option></select>
-      </div>
-      <button class="btn ghost" id="btn-load-games" onclick="loadEvents()">Load games</button>
-      <button class="btn" id="btn-load-props" onclick="loadProps()" disabled>Pull props</button>
+    <div class="sport-row">
+      <button class="sport-pill on">NFL</button>
+      <span class="dim" style="font-size:12.5px">More sports later; the structure is ready for them.</span>
     </div>
 
-    <div class="chips" id="market-chips"></div>
-    <div class="chips" id="game-chips"></div>
-    <div id="weather-banner"></div>
-    <div id="board-filters" style="display:none"></div>
-    <div id="board-status"></div>
-    <div id="board-results"></div>
+    <div class="chips" id="season-chips"></div>
+    <div class="chips" id="scope-chips"></div>
+
+    <div class="board-controls">
+      <div class="field" style="max-width:170px">
+        <label for="wk-season">Season</label>
+        <select id="wk-season">
+          <option value="2026" selected>2026 (upcoming)</option>
+          <option value="2025">2025</option>
+        </select>
+      </div>
+      <div class="field" style="max-width:150px">
+        <label for="wk-week">Week</label>
+        <select id="wk-week"></select>
+      </div>
+      <button class="btn" id="btn-load-week" onclick="loadWeek()">Load week</button>
+      <div class="field narrow" style="max-width:150px">
+        <label for="rate-min">Min rating %</label>
+        <input type="number" id="rate-min" step="0.5" value="0" onchange="ratingFilter.min = parseFloat(this.value)||0; rerenderCards();">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin:0;text-transform:none;font-family:var(--sans);font-size:13px;letter-spacing:0;color:var(--chalk-dim);height:41px">
+        <input type="checkbox" id="rate-only" style="width:15px;height:15px;accent-color:var(--amber)" onchange="ratingFilter.ratedOnly = this.checked; rerenderCards();">
+        Rated edges only
+      </label>
+    </div>
+
+    <div id="week-status"></div>
+    <div id="game-cards"></div>
   </section>
 
   <!-- ================= FUTURES ================= -->
@@ -340,7 +391,36 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
     </div>
   </section>
 
-  <!-- ================= BET LOG ================= -->
+  <!-- ================= GAME BREAKDOWN ================= -->
+  <section id="view-games" class="view">
+    <div class="eyebrow">Full box scores · ESPN · no key needed</div>
+    <h1>Break down any game</h1>
+    <p class="sub">Pull the complete box score for any game: every player's stat line for both teams, who was home and who was away, the final score, venue and game weather. This is the raw material behind the analyzer's per-game numbers, and completed games are available year round, so it works today in the offseason. Hit Analyze on any player to send them straight to the analyzer with their opponent prefilled.</p>
+
+    <div class="board-controls">
+      <div class="field" style="max-width:150px">
+        <label for="gb-season">Season</label>
+        <select id="gb-season">
+          <option value="2025" selected>2025</option>
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+        </select>
+      </div>
+      <div class="field" style="max-width:150px">
+        <label for="gb-week">Week</label>
+        <select id="gb-week"></select>
+      </div>
+      <button class="btn ghost" id="btn-gb-games" onclick="loadScoreboard()">Load games</button>
+      <div class="field" style="min-width:260px;max-width:420px">
+        <label for="gb-game">Game</label>
+        <select id="gb-game"><option value="">Load games first</option></select>
+      </div>
+      <button class="btn" id="btn-gb-load" onclick="loadBreakdown()" disabled>Break it down</button>
+    </div>
+
+    <div id="gb-status"></div>
+    <div id="gb-results"></div>
+  </section>
   <section id="view-log" class="view">
     <div class="eyebrow">Tracking · closing line value · P/L</div>
     <h1>Bet log</h1>
@@ -406,6 +486,12 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
         <p><strong>Weather adjustment.</strong> Outdoor games only. Wind of 15+ mph trims passing and receiving projections 5%, 20+ mph trims 10%, and a wet forecast trims another 3%. Domes and closed roofs are neutral.</p>
         <p><strong>Edge, EV and CLV.</strong> Edge is model or historical probability minus the price's implied probability. EV is expected profit per $100 if that probability holds. CLV compares your line to the closing line; beating the close is the earliest sign of a real edge.</p>
         <p><strong>Futures.</strong> Team outrights come off the same odds feed. The no-vig market % normalizes every book's full field to 100%, and a value flag means the best available price beats that consensus. Player award futures are not on the free feed, so the futures tab includes a calculator that strips the vig from any list you paste from a book.</p>
+        <p><strong>The rating.</strong> Each prop's signed percentage is the blend's probability minus the implied probability of the best available price, shown for whichever side is stronger. The blend is 55% model projection and 45% historical hit rate, then shrunk toward the market's no-vig opinion based on sample size; the market always keeps at least 40% of the say, and thin samples lean on it harder. Green positive means edge to you at that price, red negative means the book has you. Ratings past ±15% almost always mean stale or mismatched data, so verify before trusting one. Team prop ratings are market-based only: fair probability against the best price, with no player model behind them.</p>
+        <p><strong>Usage data.</strong> Player ratings also fold in an nflverse usage trend: a player whose recent targets, carries, or attempts run above their season norm gets a small projection boost, capped at ±8%. If the usage file fails to load, ratings still work without it.</p>
+        <label style="display:flex;align-items:center;gap:10px;margin:8px 0 0;text-transform:none;font-family:var(--sans);font-size:13.5px;letter-spacing:0;color:var(--chalk)">
+          <input type="checkbox" id="autoload-toggle" style="width:16px;height:16px;accent-color:var(--amber)" onchange="setAutoLoad(this.checked)">
+          Auto-load props for every game when a week loads (roughly 15 to 30 credits per week view; suited to the paid tier)
+        </label>
       </div>
 
       <div class="panel">
@@ -667,6 +753,7 @@ function weatherFactors(wind, precipProb){
 }
 function renderWeatherBanner(w, home, away, kickoffIso){
   const el = document.getElementById("weather-banner");
+  if (!el) return;
   if (!w){ el.innerHTML = ""; return; }
   const when = new Date(kickoffIso).toLocaleString(undefined,{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
   let items = `<div class="w-item"><span class="k">Game</span><span class="v">${escapeHtml(away)} @ ${escapeHtml(home)}</span></div>
@@ -763,9 +850,9 @@ function project(games, opts){
   if (opts.kind === "pass"){
     weather = weatherFactors(opts.wind != null ? opts.wind : null, opts.precipProb != null ? opts.precipProb : null).pass;
   }
-  const proj = base * def.factor * weather;
+  const proj = base * def.factor * weather * (opts.usageFactor || 1);
   const sd = stdev(vals);
-  return { proj, base, wRecent, seasonAvg, def, weather, sd, n: vals.length };
+  return { proj, base, wRecent, seasonAvg, def, weather, usage: opts.usageFactor || 1, sd, n: vals.length };
 }
 function projOverProb(projection, line){
   if (!projection || projection.sd == null || projection.sd === 0 || projection.n < SITE_CONFIG.model.minGamesForProb) return null;
@@ -773,111 +860,599 @@ function projOverProb(projection, line){
 }
 
 /* ============================================================
-   Live board (steps 3, 8, 10 live here)
+   Prop board: sport -> season type -> week -> game cards
    ============================================================ */
-let activeMarkets = [...SITE_CONFIG.defaultMarkets];
-let gameMarkets = []; // h2h, spreads, totals
-const GAME_MARKETS = { h2h: "Moneyline", spreads: "Spread", totals: "Game total" };
-let currentEvents = [];
-let currentEvent = null;   // selected event object
-let boardModel = null;     // parsed rows per market
-let gameLinesModel = null; // parsed h2h/spreads/totals
-let boardFilterState = { mode: "all", minGap: 1.5 };
+let seasonType = 2;               // 2 regular, 1 preseason
+let propScopes = { team: true, player: true };
+let weekGames = [];               // ESPN games for the loaded week
+let oddsEventsCache = { t: 0, sportKey: "", events: [] };
+let preseasonSportKey = null;     // discovered from the feed
+let cardModels = {};              // espnId -> card state
+let ratingFilter = { min: 0, ratedOnly: false };
+const TEAM_MARKETS_FULL = "h2h,spreads,totals,team_totals";
+const TEAM_MARKETS_BASIC = "h2h,spreads,totals";
 
 function renderChips(){
-  const box = document.getElementById("market-chips");
-  box.innerHTML = Object.entries(SITE_CONFIG.markets).map(([k,m]) =>
-    `<button class="chip ${activeMarkets.includes(k) ? "on" : ""}" onclick="toggleMarket('${k}')">${m.label}</button>`
-  ).join("");
-  const gbox = document.getElementById("game-chips");
-  gbox.innerHTML = `<span class="pill" style="align-self:center">Game lines</span> ` +
-    Object.entries(GAME_MARKETS).map(([k,label]) =>
-      `<button class="chip ${gameMarkets.includes(k) ? "on" : ""}" onclick="toggleGameMarket('${k}')">${label}</button>`
-    ).join("");
+  document.getElementById("season-chips").innerHTML =
+    `<span class="pill" style="align-self:center">Schedule</span> ` +
+    `<button class="chip ${seasonType===2?"on":""}" onclick="setSeasonType(2)">Regular season</button>` +
+    `<button class="chip ${seasonType===1?"on":""}" onclick="setSeasonType(1)">Preseason</button>`;
+  document.getElementById("scope-chips").innerHTML =
+    `<span class="pill" style="align-self:center">Props</span> ` +
+    `<button class="chip ${propScopes.team?"on":""}" onclick="toggleScope('team')">Team props</button>` +
+    `<button class="chip ${propScopes.player?"on":""}" onclick="toggleScope('player')">Player props</button>`;
+  populateWeekSelect();
 }
-function toggleGameMarket(k){
-  gameMarkets = gameMarkets.includes(k) ? gameMarkets.filter(x=>x!==k) : [...gameMarkets, k];
+function setSeasonType(t){ seasonType = t; renderChips(); }
+function toggleScope(s){
+  propScopes[s] = !propScopes[s];
+  if (!propScopes.team && !propScopes.player) propScopes[s] = true;
   renderChips();
 }
-function toggleMarket(k){
-  activeMarkets = activeMarkets.includes(k) ? activeMarkets.filter(x=>x!==k) : [...activeMarkets, k];
-  if (!activeMarkets.length) activeMarkets = [k];
-  renderChips();
+function populateWeekSelect(){
+  const sel = document.getElementById("wk-week");
+  const n = seasonType === 1 ? 4 : 18;
+  const cur = sel.value;
+  sel.innerHTML = Array.from({length:n},(_,i)=>`<option value="${i+1}">Week ${i+1}</option>`).join("");
+  if (cur && Number(cur) <= n) sel.value = cur;
 }
-function boardStatus(html){ document.getElementById("board-status").innerHTML = html || ""; }
+function weekStatus(html){ document.getElementById("week-status").innerHTML = html || ""; }
 
-async function loadEvents(){
-  const key = getKey();
-  if (!key){ boardStatus(`<div class="note err">Add your Odds API key in Setup first.</div>`); return; }
-  const btn = document.getElementById("btn-load-games");
+async function loadWeek(){
+  const year = document.getElementById("wk-season").value;
+  const week = document.getElementById("wk-week").value;
+  const btn = document.getElementById("btn-load-week");
   btn.disabled = true;
-  boardStatus(`<div class="loading-row"><span class="spinner"></span> Loading upcoming games...</div>`);
+  cardModels = {};
+  document.getElementById("game-cards").innerHTML = "";
+  weekStatus(`<div class="loading-row"><span class="spinner"></span> Loading ${seasonType===1?"preseason":"regular season"} week ${escapeHtml(week)}, ${escapeHtml(year)}...</div>`);
   try {
-    const res = await fetch(`${SITE_CONFIG.oddsApiBase}/sports/${SITE_CONFIG.sportKey}/events?apiKey=${encodeURIComponent(key)}`);
-    if (!res.ok) throw new Error("HTTP "+res.status);
-    currentEvents = await res.json();
-    const sel = document.getElementById("game-select");
-    if (!currentEvents.length){
-      sel.innerHTML = `<option value="">No games on the feed</option>`;
-      boardStatus(`<div class="note">No upcoming NFL games on the feed right now. During the offseason the board goes quiet; props return around the preseason in August. The analyzer still works year round.</div>`);
-    } else {
-      sel.innerHTML = `<option value="">Pick a game</option>` + currentEvents.map(ev => {
-        const d = new Date(ev.commence_time);
-        const when = d.toLocaleString(undefined,{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
-        return `<option value="${ev.id}">${escapeHtml(ev.away_team)} @ ${escapeHtml(ev.home_team)} · ${when}</option>`;
-      }).join("");
-      document.getElementById("btn-load-props").disabled = false;
-      boardStatus("");
-    }
-  } catch(e){
-    boardStatus(`<div class="note err">Could not load games (${escapeHtml(e.message)}). Check your key in Setup, and note this page must be deployed or opened locally, not previewed inside Claude.</div>`);
-  } finally { btn.disabled = false; }
-}
-
-async function loadProps(){
-  const key = getKey();
-  const eventId = document.getElementById("game-select").value;
-  if (!eventId){ boardStatus(`<div class="note err">Pick a game first.</div>`); return; }
-  currentEvent = currentEvents.find(e => e.id === eventId) || null;
-  const btn = document.getElementById("btn-load-props");
-  btn.disabled = true;
-  document.getElementById("board-results").innerHTML = "";
-  document.getElementById("board-filters").style.display = "none";
-  boardStatus(`<div class="loading-row"><span class="spinner"></span> Pulling props and weather...</div>`);
-
-  // weather + defense in parallel with props
-  const season = guessSeason(currentEvent ? currentEvent.commence_time : null);
-  const weatherP = currentEvent ? fetchWeather(currentEvent.home_team, currentEvent.commence_time) : Promise.resolve(null);
-  const defP = loadDefenseData(season);
-
-  try {
-    const allMarkets = [...activeMarkets, ...gameMarkets];
-    const url = `${SITE_CONFIG.oddsApiBase}/sports/${SITE_CONFIG.sportKey}/events/${eventId}/odds` +
-      `?apiKey=${encodeURIComponent(key)}&regions=${SITE_CONFIG.regions}&oddsFormat=american&markets=${allMarkets.join(",")}`;
+    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=${seasonType}&week=${encodeURIComponent(week)}&dates=${encodeURIComponent(year)}`;
     const res = await fetch(url);
-    const remaining = res.headers.get("x-requests-remaining");
-    if (!res.ok){
-      const body = await res.json().catch(()=>({}));
-      throw new Error(body.message || ("HTTP "+res.status));
+    if (!res.ok) throw new Error("scoreboard HTTP "+res.status);
+    weekGames = parseScoreboard(await res.json());
+    if (!weekGames.length){
+      weekStatus(`<div class="note">No games found for that week. Preseason schedules post in spring; if this is a far-future week, try again once the league publishes it.</div>`);
+      return;
     }
-    const data = await res.json();
-    currentWeather = await weatherP;
-    await defP;
-    if (currentEvent) renderWeatherBanner(currentWeather, currentEvent.home_team, currentEvent.away_team, currentEvent.commence_time);
-    boardModel = buildBoardModel(data, eventId);
-    gameLinesModel = gameMarkets.length ? buildGameLinesModel(data) : null;
-    renderBoardFilters();
-    renderBoard();
-    tickChecklist("deploy"); tickChecklist("board");
-    boardStatus(remaining ? `<p class="dim mono" style="font-size:12px;margin:6px 0 14px">Odds API credits remaining this month: ${escapeHtml(remaining)}</p>` : "");
+    await ensureOddsEvents();
+    weekGames.forEach(matchOddsEvent);
+    renderGameCards();
+    const matched = weekGames.filter(g => g.oddsId).length;
+    weekStatus(`<p class="dim mono" style="font-size:12px;margin:6px 0 14px">${weekGames.length} games · ${matched} with betting lines on the feed${getAutoLoad() ? " · auto-loading props (paid-tier mode)" : ""}</p>`);
+    tickChecklist("deploy");
+    if (getAutoLoad()) autoLoadAllCards();
   } catch(e){
-    boardStatus(`<div class="note err">Could not pull props: ${escapeHtml(e.message)}. Player prop markets usually post a few days before kickoff, so early in the week a game can come back empty.</div>`);
+    weekStatus(`<div class="note err">Could not load the week (${escapeHtml(e.message)}). Deploy the site first; feeds reject requests from a local file.</div>`);
   } finally { btn.disabled = false; }
+}
+
+async function ensureOddsEvents(){
+  const key = getKey();
+  if (!key){ oddsEventsCache = { t: Date.now(), sportKey:"", events: [] }; return; }
+  let sportKey = SITE_CONFIG.sportKey;
+  if (seasonType === 1){
+    if (preseasonSportKey === null){
+      try {
+        const res = await fetch(`${SITE_CONFIG.oddsApiBase}/sports?apiKey=${encodeURIComponent(key)}&all=true`);
+        const sports = res.ok ? await res.json() : [];
+        const found = sports.find(s => s.key.includes("nfl") && s.key.includes("preseason"));
+        preseasonSportKey = found ? found.key : "";
+      } catch(e){ preseasonSportKey = ""; }
+    }
+    sportKey = preseasonSportKey || SITE_CONFIG.sportKey;
+  }
+  const fresh = (Date.now() - oddsEventsCache.t) < 10*60*1000 && oddsEventsCache.sportKey === sportKey;
+  if (fresh) return;
+  try {
+    const res = await fetch(`${SITE_CONFIG.oddsApiBase}/sports/${sportKey}/events?apiKey=${encodeURIComponent(key)}`);
+    const events = res.ok ? await res.json() : [];
+    oddsEventsCache = { t: Date.now(), sportKey, events };
+  } catch(e){
+    oddsEventsCache = { t: Date.now(), sportKey, events: [] };
+  }
+}
+function matchOddsEvent(g){
+  g.oddsId = null; g.oddsSportKey = oddsEventsCache.sportKey;
+  const gd = g.date ? g.date.getTime() : 0;
+  const hit = oddsEventsCache.events.find(ev =>
+    ev.home_team === g.home && ev.away_team === g.away &&
+    Math.abs(new Date(ev.commence_time).getTime() - gd) < 36*3600*1000);
+  if (hit){ g.oddsId = hit.id; g.commence = hit.commence_time; }
+}
+
+/* ---------- game cards ---------- */
+function renderGameCards(){
+  document.getElementById("game-cards").innerHTML =
+    `<div class="gcards">` + weekGames.map(gameCardHtml).join("") + `</div>`;
+}
+function gameCardHtml(g){
+  const when = g.date ? g.date.toLocaleString(undefined,{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "";
+  const scoreBit = g.completed ? `<span class="mono">${escapeHtml(String(g.awayScore))}-${escapeHtml(String(g.homeScore))} final</span>` : escapeHtml(when);
+  const btns = [];
+  if (g.oddsId){
+    if (propScopes.team)   btns.push(`<button class="btn ghost small" id="bt-team-${g.id}" onclick="loadGameProps('${g.id}','team')">Team props</button>`);
+    if (propScopes.player) btns.push(`<button class="btn small" id="bt-player-${g.id}" onclick="loadGameProps('${g.id}','player')">Player props</button>`);
+  }
+  const tag = g.oddsId ? `<span class="pill up">lines live</span>` : (g.completed ? `<span class="pill">final</span>` : `<span class="pill">no lines yet</span>`);
+  return `
+    <div class="gcard" id="gc-${g.id}">
+      <div class="gcard-head">
+        <div>
+          <div class="gcard-teams">${escapeHtml(g.away)} <span class="dim">@</span> ${escapeHtml(g.home)}</div>
+          <div class="gcard-meta">${scoreBit}</div>
+        </div>
+        ${tag}
+      </div>
+      <div class="gcard-actions">${btns.join("") || `<span class="dim" style="font-size:12.5px">${g.completed ? "Use the Games tab for the box score." : "Books have not posted this game yet."}</span>`}</div>
+      <div class="gcard-body" id="gb-${g.id}"></div>
+    </div>`;
+}
+async function autoLoadAllCards(){
+  for (const g of weekGames){
+    if (!g.oddsId) continue;
+    if (propScopes.team){ await loadGameProps(g.id, "team"); }
+    if (propScopes.player){ await loadGameProps(g.id, "player"); }
+    await new Promise(r => setTimeout(r, 400));
+  }
+}
+
+/* ---------- per-game prop loading ---------- */
+async function loadGameProps(espnId, scope){
+  const key = getKey();
+  const g = weekGames.find(x => x.id === espnId);
+  if (!g || !g.oddsId) return;
+  if (!key){ weekStatus(`<div class="note err">Add your Odds API key in Setup to pull props.</div>`); return; }
+  const btn = document.getElementById(`bt-${scope}-${espnId}`);
+  if (btn) btn.disabled = true;
+  const body = document.getElementById(`gb-${espnId}`);
+  cardModels[espnId] = cardModels[espnId] || { g };
+  const cm = cardModels[espnId];
+  cm[scope + "Loading"] = true;
+  renderCardBody(espnId, `Pulling ${scope} props...`);
+  try {
+    if (!cm.weather){
+      cm.weather = await fetchWeather(g.home, g.commence || (g.date ? g.date.toISOString() : new Date().toISOString()));
+    }
+    let data;
+    if (scope === "team"){
+      data = await fetchEventOdds(g, TEAM_MARKETS_FULL, TEAM_MARKETS_BASIC);
+      cm.team = parseTeamProps(data);
+      rateTeamProps(cm.team);
+    } else {
+      data = await fetchEventOdds(g, Object.keys(SITE_CONFIG.markets).join(","), null);
+      cm.player = [];
+      const model = buildBoardModel(data, g.oddsId);
+      Object.values(model).forEach(list => list.forEach(r => cm.player.push(r)));
+      tickChecklist("board");
+    }
+    cm[scope + "Loading"] = false;
+    renderCardBody(espnId);
+    if (scope === "player" && cm.player && cm.player.length) scoreCardPlayers(espnId);
+  } catch(e){
+    cm[scope + "Loading"] = false;
+    cm[scope + "Error"] = e.message;
+    renderCardBody(espnId);
+  } finally { if (btn) btn.disabled = false; }
+}
+async function fetchEventOdds(g, markets, fallbackMarkets){
+  const key = getKey();
+  const mk = enc => `${SITE_CONFIG.oddsApiBase}/sports/${g.oddsSportKey || SITE_CONFIG.sportKey}/events/${g.oddsId}/odds?apiKey=${encodeURIComponent(key)}&regions=${SITE_CONFIG.regions}&oddsFormat=american&markets=${enc}`;
+  let res = await fetch(mk(markets));
+  if (res.status === 422 && fallbackMarkets){ res = await fetch(mk(fallbackMarkets)); }
+  const remaining = res.headers.get("x-requests-remaining");
+  if (remaining) weekStatus(`<p class="dim mono" style="font-size:12px;margin:6px 0 14px">Odds API credits remaining this month: ${escapeHtml(remaining)}</p>`);
+  if (!res.ok){
+    const bodyJson = await res.json().catch(()=>({}));
+    throw new Error(bodyJson.message || ("HTTP "+res.status));
+  }
+  return res.json();
+}
+
+/* team props: h2h, spreads, totals, team totals, rated on market value */
+function parseTeamProps(data){
+  const lines = buildGameLinesModel(data);
+  const teamTotals = {};
+  (data.bookmakers || []).forEach(bk => {
+    (bk.markets || []).forEach(mkt => {
+      if (mkt.key !== "team_totals") return;
+      (mkt.outcomes || []).forEach(o => {
+        const team = o.description || "";
+        const side = o.name;
+        if (!team) return;
+        teamTotals[team] = teamTotals[team] || {};
+        teamTotals[team][side] = teamTotals[team][side] || [];
+        teamTotals[team][side].push({ book: bk.title, price: o.price, point: o.point });
+      });
+    });
+  });
+  return { lines, teamTotals };
+}
+function twoWayFair(entriesA, entriesB){
+  // pair per book, devig; return median fair prob of side A
+  const probs = [];
+  entriesA.forEach(a => {
+    const b = (entriesB || []).find(x => x.book === a.book);
+    if (!b) return;
+    const pA = impliedProb(a.price), pB = impliedProb(b.price);
+    if (pA && pB) probs.push(pA/(pA+pB));
+  });
+  return probs.length ? median(probs) : null;
+}
+function bestEntry(entries){
+  let best = null;
+  (entries || []).forEach(e => { if (!best || profitPer100(e.price) > profitPer100(best.price)) best = e; });
+  return best;
+}
+function rateTeamProps(team){
+  team.rated = [];
+  const push = (market, label, entries, oppEntries, pointOf) => {
+    const best = bestEntry(entries);
+    if (!best) return;
+    const fair = twoWayFair(entries, oppEntries);
+    const edge = fair != null ? fair - impliedProb(best.price) : null;
+    team.rated.push({ market, label, best, fair, edge, books: entries.length,
+      conf: entries.length >= 4 ? "High" : entries.length >= 2 ? "Medium" : "Low",
+      point: pointOf ? pointOf(best) : null });
+  };
+  const L = team.lines;
+  const names = m => Object.keys(L[m] || {});
+  // moneyline: each side vs the other
+  const h2hNames = names("h2h");
+  if (h2hNames.length === 2){
+    push("h2h", h2hNames[0], L.h2h[h2hNames[0]], L.h2h[h2hNames[1]]);
+    push("h2h", h2hNames[1], L.h2h[h2hNames[1]], L.h2h[h2hNames[0]]);
+  }
+  const spNames = names("spreads");
+  if (spNames.length === 2){
+    push("spreads", spNames[0], L.spreads[spNames[0]], L.spreads[spNames[1]], b => b.point);
+    push("spreads", spNames[1], L.spreads[spNames[1]], L.spreads[spNames[0]], b => b.point);
+  }
+  if (L.totals && L.totals.Over && L.totals.Under){
+    push("totals", "Over", L.totals.Over, L.totals.Under, b => b.point);
+    push("totals", "Under", L.totals.Under, L.totals.Over, b => b.point);
+  }
+  Object.entries(team.teamTotals || {}).forEach(([tName, sides]) => {
+    if (sides.Over && sides.Under){
+      push("team_totals", tName + " Over", sides.Over, sides.Under, b => b.point);
+      push("team_totals", tName + " Under", sides.Under, sides.Over, b => b.point);
+    }
+  });
+  team.rated.sort((a,b) => (b.edge || -1) - (a.edge || -1));
+}
+
+/* ---------- rendering ---------- */
+function rerenderCards(){ Object.keys(cardModels).forEach(id => renderCardBody(id)); }
+function renderCardBody(espnId, loadingMsg){
+  const body = document.getElementById(`gb-${espnId}`);
+  if (!body) return;
+  const cm = cardModels[espnId];
+  if (!cm){ body.innerHTML = ""; return; }
+  const bits = [];
+  if (cm.weather) bits.push(weatherLineHtml(cm.weather));
+  if (loadingMsg || cm.teamLoading || cm.playerLoading)
+    bits.push(`<div class="loading-row" style="padding:14px"><span class="spinner"></span> ${escapeHtml(loadingMsg || "Working...")}</div>`);
+  if (cm.teamError) bits.push(`<div class="note err">Team props: ${escapeHtml(cm.teamError)}</div>`);
+  if (cm.playerError) bits.push(`<div class="note err">Player props: ${escapeHtml(cm.playerError)}. Props usually post a few days before kickoff.</div>`);
+  if (cm.team && cm.team.rated && cm.team.rated.length) bits.push(renderTeamPropsHtml(cm.team));
+  else if (cm.team && !cm.teamLoading) bits.push(`<div class="panel empty" style="padding:18px">No team markets posted yet.</div>`);
+  if (cm.player){
+    if (cm.player.length) bits.push(renderPlayerPropsHtml(espnId, cm.player, cm.scoreProgress));
+    else if (!cm.playerLoading) bits.push(`<div class="panel empty" style="padding:18px">No player props posted yet. Books usually hang them a few days out.</div>`);
+  }
+  body.innerHTML = bits.join("");
+}
+function weatherLineHtml(w){
+  if (!w) return "";
+  if (w.dome) return `<div class="gcard-weather"><span class="pill">dome · weather neutral</span></div>`;
+  if (w.error || w.outOfRange) return `<div class="gcard-weather"><span class="pill">${escapeHtml(w.desc || "weather unavailable")}</span></div>`;
+  const trim = Math.round((1 - w.factors.pass)*100);
+  return `<div class="gcard-weather">
+    <span class="mono" style="font-size:12px">${Math.round(w.wind)} mph wind · ${w.precipProb != null ? w.precipProb + "% precip" : ""} · ${Math.round(w.temp)}°F</span>
+    ${trim > 0 ? `<span class="pill hot">passing trimmed ${trim}%</span>` : `<span class="pill up">weather neutral</span>`}
+  </div>`;
+}
+function renderTeamPropsHtml(team){
+  const MKT_LABEL = { h2h:"Moneyline", spreads:"Spread", totals:"Game total", team_totals:"Team total" };
+  return `
+    <h3 style="margin:14px 0 6px">Team props</h3>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Market</th><th>Side</th><th>Line</th><th>Best price</th><th>Fair %</th><th>Rating</th><th>Conf</th></tr></thead>
+      <tbody>
+      ${team.rated.map(r => `<tr>
+        <td class="dim">${MKT_LABEL[r.market] || r.market}</td>
+        <td class="player-cell">${escapeHtml(r.label)}</td>
+        <td class="num">${r.point != null ? (r.point > 0 && r.market === "spreads" ? "+" : "") + r.point : "—"}</td>
+        <td class="num"><span class="${r.best.price > 0 ? "price-up" : ""}">${fmtAmerican(r.best.price)}</span><span class="book-tag">${escapeHtml(r.best.book)}</span></td>
+        <td class="num dim">${r.fair != null ? pct(r.fair) : "—"}</td>
+        <td>${rateChipHtml(r.edge, null)}</td>
+        <td>${confTag(r.conf)}</td>
+      </tr>`).join("")}
+      </tbody>
+    </table></div>
+    <p class="dim" style="font-size:11.5px;margin:6px 0 2px">Team ratings are market-based: the fair no-vig probability against the best available price. There is no player model behind them.</p>`;
+}
+function renderPlayerPropsHtml(espnId, rows, progress){
+  const groups = {};
+  rows.forEach(r => { (groups[r.mktKey] = groups[r.mktKey] || []).push(r); });
+  const blocks = Object.entries(groups).map(([mktKey, list]) => {
+    const cfg = SITE_CONFIG.markets[mktKey];
+    let vis = list.filter(r => {
+      if (ratingFilter.ratedOnly && r.rating == null) return false;
+      if (ratingFilter.min > 0 && (r.rating == null || r.rating*100 < ratingFilter.min)) return false;
+      return true;
+    });
+    vis.sort((a,b) => ((b.rating != null ? b.rating : -9) - (a.rating != null ? a.rating : -9)) || (b.flagged - a.flagged));
+    if (!vis.length) return "";
+    return `
+      <h3 style="margin:14px 0 6px">${cfg.label}</h3>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Player</th><th>Line</th><th>Best over</th><th>Best under</th><th>Rating</th><th>Conf</th><th></th></tr></thead>
+        <tbody>
+        ${vis.map(r => {
+          const did = `d-${espnId}-${mktKey}-${r.player.replace(/[^a-z0-9]/gi,"")}`;
+          return `<tr>
+            <td class="player-cell" title="${r.flagged ? "Line drift: " + escapeHtml(r.driftNote) : ""}">${escapeHtml(r.player)}${r.flagged ? ` <span class="pill hot" style="font-size:9.5px">drift</span>` : ""}</td>
+            <td class="num" title="Range ${r.lo}–${r.hi}">${r.cons}</td>
+            <td class="num">${r.bestOver ? `<span class="price-up">${fmtAmerican(r.bestOver.price)}</span> <span class="dim">(${r.bestOver.point})</span><span class="book-tag">${escapeHtml(r.bestOver.book)}</span>` : "—"}</td>
+            <td class="num">${r.bestUnder ? `<span class="price-down">${fmtAmerican(r.bestUnder.price)}</span> <span class="dim">(${r.bestUnder.point})</span><span class="book-tag">${escapeHtml(r.bestUnder.book)}</span>` : "—"}</td>
+            <td>${r.rating != null ? rateChipHtml(r.rating, did, r.side) : (r.rated === false ? `<span class="pill">no data</span>` : `<span class="dim mono" style="font-size:11px">…</span>`)}</td>
+            <td>${r.conf ? confTag(r.conf) : ""}</td>
+            <td style="white-space:nowrap">
+              <button class="btn ghost small" onclick='sendToAnalyzer(${jsAttr(r.player)}, "${mktKey}", ${r.cons})'>Analyze</button>
+              <button class="btn ghost small" onclick='quickLog(${jsAttr(r.player)}, "${mktKey}", ${r.cons}, ${r.side === "Under" && r.bestUnder ? r.bestUnder.price : (r.bestOver ? r.bestOver.price : -110)})'>Log</button>
+            </td>
+          </tr>
+          ${r.rating != null ? `<tr class="detail-row" id="${did}" style="display:none"><td colspan="7">${detailHtml(r)}</td></tr>` : ""}`;
+        }).join("")}
+        </tbody>
+      </table></div>`;
+  }).filter(Boolean);
+  const prog = progress && progress.total && progress.done < progress.total
+    ? `<div class="score-progress"><div class="score-bar" style="width:${Math.round(progress.done/progress.total*100)}%"></div><span>Rating players: ${progress.done}/${progress.total}</span></div>` : "";
+  return `<div style="margin-top:6px">${prog}${blocks.join("") || `<div class="panel empty" style="padding:18px">Nothing clears the current rating filter.</div>`}</div>`;
+}
+function detailHtml(r){
+  const d = r.detail || {};
+  const fmtP = p => p != null ? pct(p,0) : "—";
+  return `<div class="detail-grid">
+    <span><b>Model</b> ${fmtP(d.pModel)}${d.proj != null ? ` (proj ${d.proj.toFixed(1)})` : ""}</span>
+    <span><b>History</b> ${fmtP(d.pHist)}${d.n != null ? ` (${d.n} games)` : ""}</span>
+    <span><b>Market fair</b> ${fmtP(d.pFair)}</span>
+    <span><b>Blend</b> ${fmtP(d.pFinal)} on the ${r.side || "over"}</span>
+    <span><b>Usage</b> ${d.usage != null ? (d.usage >= 1 ? "+" : "") + ((d.usage-1)*100).toFixed(1) + "%" : "n/a"}</span>
+    <span><b>Defense</b> ${d.def != null ? (d.def >= 1 ? "+" : "") + ((d.def-1)*100).toFixed(1) + "%" + (d.opp ? " vs " + escapeHtml(d.opp) : "") : "neutral"}</span>
+    <span><b>Weather</b> ${d.weather != null && d.weather < 1 ? "−" + ((1-d.weather)*100).toFixed(0) + "%" : "neutral"}</span>
+    <span><b>Season</b> ${d.season || "—"}</span>
+  </div>`;
+}
+function rateChipHtml(edge, detailId, side){
+  if (edge == null) return `<span class="pill">—</span>`;
+  const p = edge * 100;
+  const capped = Math.max(-15, Math.min(15, p));
+  const mag = Math.abs(capped);
+  const cls = mag < 1 ? "r-neu" : (capped > 0 ? (mag >= 6 ? "r-pos3" : mag >= 3 ? "r-pos2" : "r-pos1") : (mag >= 6 ? "r-neg3" : mag >= 3 ? "r-neg2" : "r-neg1"));
+  const txt = `${side ? side.charAt(0) + " " : ""}${capped >= 0 ? "+" : ""}${capped.toFixed(1)}%${Math.abs(p) > 15 ? "+" : ""}`;
+  const extra = Math.abs(p) > 15 ? ` title="Rating beyond ±15% usually means stale data; verify before trusting it."` : "";
+  return detailId
+    ? `<button class="rate ${cls}"${extra} onclick="toggleDetail('${detailId}')">${txt}</button>`
+    : `<span class="rate ${cls}"${extra}>${txt}</span>`;
+}
+function confTag(c){
+  const cls = c === "High" ? "up" : c === "Low" ? "down" : "";
+  return `<span class="pill ${cls}" style="font-size:10px">${c}${c === "Low" ? " conf" : ""}</span>`;
+}
+function toggleDetail(id){
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === "none" ? "" : "none";
+}
+
+/* ---------- player scoring: nflverse + gamelog + blend ---------- */
+async function scoreCardPlayers(espnId){
+  const cm = cardModels[espnId];
+  if (!cm || !cm.player || cm.scoring) return;
+  cm.scoring = true;
+  const g = cm.g;
+  const statsSeason = pickStatsSeason(g.date);
+  await Promise.all([loadDefenseData(statsSeason), ensureNflverse(statsSeason)]);
+  const homeAbbr = (SITE_CONFIG.stadiums[g.home] || {}).abbr;
+  const awayAbbr = (SITE_CONFIG.stadiums[g.away] || {}).abbr;
+  const rows = cm.player.slice(0, SITE_CONFIG.model.boardScoreCap * 2);
+  cm.scoreProgress = { done: 0, total: rows.length };
+  for (const r of rows){
+    try { await scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr); }
+    catch(e){ r.rated = false; }
+    cm.scoreProgress.done++;
+    if (cm.scoreProgress.done % 3 === 0 || cm.scoreProgress.done === rows.length) renderCardBody(espnId);
+    await new Promise(res => setTimeout(res, 200));
+  }
+  cm.player.forEach(r => { if (r.rating == null && r.rated !== true) r.rated = false; });
+  cm.scoring = false;
+  renderCardBody(espnId);
+}
+async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
+  const cfg = SITE_CONFIG.markets[r.mktKey];
+  const pid = await resolvePlayerId(r.player);
+  if (!pid){ r.rated = false; return; }
+  let season = statsSeason;
+  let games = await getGamelog(pid, season, cfg.espn);
+  if (games.length < SITE_CONFIG.model.minGamesForProb && season > 2023){
+    season = season - 1;
+    games = await getGamelog(pid, season, cfg.espn);
+  }
+  const n = games.length;
+  // history component vs the consensus line
+  let pHist = null;
+  if (n){
+    const all = analyzeGames(games, r.cons);
+    const l5 = analyzeGames(games.slice(-5), r.cons);
+    if (all.hitRate != null) pHist = l5.hitRate != null ? 0.6*all.hitRate + 0.4*l5.hitRate : all.hitRate;
+  }
+  // model component
+  let pModel = null, det = { pHist, n, season, pFair: r.noVig };
+  if (n >= 2){
+    const teamAbbr = nflvTeamFor(r.player);
+    const opp = teamAbbr ? (normAbbr(teamAbbr) === homeAbbr ? awayAbbr : normAbbr(teamAbbr) === awayAbbr ? homeAbbr : null) : null;
+    const usage = nflvUsageFactor(r.player, cfg.espn);
+    const w = cm.weather && !cm.weather.dome ? cm.weather : null;
+    const p = project(games, { oppAbbr: opp, wind: w ? w.wind : null, precipProb: w ? w.precipProb : null, kind: cfg.kind, usageFactor: usage });
+    if (p){
+      pModel = projOverProb(p, r.cons);
+      det.proj = p.proj; det.usage = usage; det.def = p.def ? p.def.factor : null; det.opp = opp; det.weather = p.weather;
+    }
+  }
+  det.pModel = pModel;
+  const blend = blendProb(pModel, pHist, r.noVig, n);
+  if (blend == null){ r.rated = false; r.detail = det; return; }
+  det.pFinal = blend;
+  const edgeOver = r.bestOver ? blend - impliedProb(r.bestOver.price) : null;
+  const edgeUnder = r.bestUnder ? (1 - blend) - impliedProb(r.bestUnder.price) : null;
+  if (edgeOver == null && edgeUnder == null){ r.rated = false; r.detail = det; return; }
+  if (edgeUnder == null || (edgeOver != null && edgeOver >= edgeUnder)){ r.rating = edgeOver; r.side = "Over"; }
+  else { r.rating = edgeUnder; r.side = "Under"; }
+  const books = r.books ? r.books.length : 0;
+  r.conf = (n >= 10 && books >= 3) ? "High" : (n >= 6 && books >= 2) ? "Medium" : "Low";
+  r.rated = true;
+  r.detail = det;
+}
+function blendProb(pModel, pHist, pFair, n){
+  let pBlend = null;
+  if (pModel != null && pHist != null) pBlend = 0.55*pModel + 0.45*pHist;
+  else if (pModel != null) pBlend = pModel;
+  else if (pHist != null) pBlend = pHist;
+  if (pBlend == null) return null;
+  if (pFair == null) return pBlend;
+  const c = Math.min(1, (n || 0)/10) * 0.6;   // market always keeps at least 40% of the say
+  return c*pBlend + (1 - c)*pFair;
+}
+function pickStatsSeason(gameDate){
+  const s = guessSeason(gameDate ? gameDate.toISOString() : null);
+  const m = new Date().getMonth();
+  return (m >= 2 && m <= 7) ? s - 1 : s;   // Mar–Aug: last completed season is the sample
 }
 function guessSeason(commenceIso){
   const d = commenceIso ? new Date(commenceIso) : new Date();
   const y = d.getFullYear();
-  return d.getMonth() < 2 ? y - 1 : y; // Jan/Feb games belong to the prior season
+  return d.getMonth() < 2 ? y - 1 : y;
+}
+
+/* board -> analyzer / log handoffs */
+function sendToAnalyzer(playerName, mktKey, line){
+  const cfg = SITE_CONFIG.markets[mktKey];
+  showView("analyzer");
+  document.getElementById("stat-select").value = cfg.espn;
+  document.getElementById("line-input").value = line;
+  const input = document.getElementById("player-search");
+  input.value = playerName;
+  searchPlayers(playerName, true);
+}
+function quickLog(playerName, mktKey, line, odds){
+  showView("log");
+  document.getElementById("lf-player").value = playerName;
+  document.getElementById("lf-market").value = mktKey;
+  document.getElementById("lf-line").value = line;
+  document.getElementById("lf-odds").value = odds;
+}
+function getAutoLoad(){ return lsGet("edgeboard_autoload") === "1"; }
+function setAutoLoad(v){ lsSet("edgeboard_autoload", v ? "1" : "0"); }
+
+/* ============================================================
+   nflverse usage layer (free weekly stats: targets, carries, attempts)
+   ============================================================ */
+let nflv = { state: "idle", year: null, byName: {} };
+const NFLV_ALIASES = { WAS:"WSH", WSH:"WAS", JAC:"JAX", JAX:"JAC", LA:"LAR" };
+function normAbbr(a){
+  if (!a) return a;
+  if (a === "LA") return "LAR";
+  return a;
+}
+function abbrMatch(a, b){
+  if (!a || !b) return false;
+  return a === b || NFLV_ALIASES[a] === b || NFLV_ALIASES[b] === a;
+}
+async function ensureNflverse(year){
+  if (nflv.state === "ready" && nflv.year === year) return true;
+  if (nflv.state === "loading") return false;
+  nflv.state = "loading";
+  const candidates = [
+    `https://github.com/nflverse/nflverse-data/releases/download/player_stats/player_stats_${year}.csv`,
+    `https://github.com/nflverse/nflverse-data/releases/download/player_stats/stats_player_week_${year}.csv`,
+    `https://github.com/nflverse/nflverse-data/releases/download/player_stats/player_stats_${year-1}.csv`
+  ];
+  for (const url of candidates){
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (indexNflverse(text)){ nflv.state = "ready"; nflv.year = year; return true; }
+    } catch(e){ /* next candidate */ }
+  }
+  nflv.state = "error";
+  return false;
+}
+function indexNflverse(csvText){
+  const lines = csvText.split("\n");
+  if (lines.length < 2) return false;
+  const header = parseCsvLine(lines[0]);
+  const col = name => header.indexOf(name);
+  const cName = col("player_display_name") !== -1 ? col("player_display_name") : col("player_name");
+  const cTeam = col("recent_team") !== -1 ? col("recent_team") : col("team");
+  const cWeek = col("week");
+  const cSt = col("season_type");
+  const cTgt = col("targets"), cCar = col("carries"), cAtt = col("attempts");
+  if (cName === -1 || cWeek === -1) return false;
+  const byName = {};
+  for (let i = 1; i < lines.length; i++){
+    if (!lines[i]) continue;
+    const f = parseCsvLine(lines[i]);
+    if (cSt !== -1 && f[cSt] && f[cSt] !== "REG") continue;
+    const name = f[cName];
+    if (!name) continue;
+    const rec = byName[name] = byName[name] || { team: null, weeks: [] };
+    rec.team = (cTeam !== -1 && f[cTeam]) || rec.team;
+    rec.weeks.push({
+      week: parseInt(f[cWeek], 10) || 0,
+      targets: cTgt !== -1 ? (parseFloat(f[cTgt]) || 0) : null,
+      carries: cCar !== -1 ? (parseFloat(f[cCar]) || 0) : null,
+      attempts: cAtt !== -1 ? (parseFloat(f[cAtt]) || 0) : null
+    });
+  }
+  Object.values(byName).forEach(r => r.weeks.sort((a,b)=>a.week-b.week));
+  if (!Object.keys(byName).length) return false;
+  nflv.byName = byName;
+  return true;
+}
+function parseCsvLine(line){
+  const out = []; let cur = "", inQ = false;
+  for (let i = 0; i < line.length; i++){
+    const ch = line[i];
+    if (inQ){
+      if (ch === '"'){ if (line[i+1] === '"'){ cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === ","){ out.push(cur); cur = ""; }
+      else if (ch !== "\r") cur += ch;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+function nflvTeamFor(name){
+  const rec = nflv.byName[name];
+  return rec ? rec.team : null;
+}
+function nflvUsageFactor(name, espnStat){
+  const rec = nflv.byName[name];
+  if (!rec || rec.weeks.length < 4) return 1;
+  const metric = /pass|complet|intercept/i.test(espnStat) ? "attempts"
+    : /rush/i.test(espnStat) ? "carries" : "targets";
+  const vals = rec.weeks.map(w => w[metric]).filter(v => v != null);
+  if (vals.length < 4) return 1;
+  const seasonAvg = mean(vals);
+  const recentAvg = mean(vals.slice(-3));
+  if (!seasonAvg) return 1;
+  return clamp(1 + 0.4 * (recentAvg/seasonAvg - 1), 0.92, 1.08);
 }
 
 /* line snapshots (step 8) */
@@ -949,7 +1524,8 @@ function buildBoardModel(data, eventId){
   return out;
 }
 
-/* game lines (moneyline, spread, total) for the selected game, including future-season games */
+/* game lines (moneyline, spread, total) parser, shared by team props */
+const GAME_MARKETS = { h2h: "Moneyline", spreads: "Spread", totals: "Game total" };
 function buildGameLinesModel(data){
   const out = { h2h: {}, spreads: {}, totals: {} };
   (data.bookmakers || []).forEach(bk => {
@@ -963,215 +1539,6 @@ function buildGameLinesModel(data){
     });
   });
   return out;
-}
-function renderGameLinesHtml(){
-  if (!gameLinesModel) return "";
-  const blocks = [];
-  const consensusRow = (name, entries, showPoint) => {
-    const points = entries.map(e => e.point).filter(p => p != null);
-    const cons = points.length ? median(points) : null;
-    let best = null;
-    entries.forEach(e => { if (!best || profitPer100(e.price) > profitPer100(best.price)) best = e; });
-    const probs = entries.map(e => impliedProb(e.price)).filter(Boolean);
-    return `<tr>
-      <td class="player-cell">${escapeHtml(name)}</td>
-      ${showPoint ? `<td class="num">${cons != null ? (cons > 0 && name !== "Over" && name !== "Under" ? "+" : "") + cons : "—"}</td>` : ""}
-      <td class="num"><span class="${best.price > 0 ? "price-up" : ""}">${fmtAmerican(best.price)}</span>${best.point != null && showPoint ? ` <span class="dim">(${best.point > 0 && name !== "Over" && name !== "Under" ? "+" : ""}${best.point})</span>` : ""}<span class="book-tag">${escapeHtml(best.book)}</span></td>
-      <td class="num dim">${probs.length ? pct(median(probs)) : "—"}</td>
-      <td class="num dim">${entries.length} book${entries.length===1?"":"s"}</td>
-    </tr>`;
-  };
-  Object.entries(GAME_MARKETS).forEach(([key, label]) => {
-    const names = Object.keys(gameLinesModel[key] || {});
-    if (!names.length) return;
-    const showPoint = key !== "h2h";
-    blocks.push(`
-      <div class="market-block">
-        <h2>${label}</h2>
-        <p class="mkt-note">Best available price per side across the books posting this market</p>
-        <div class="table-scroll"><table>
-          <thead><tr><th>Side</th>${showPoint ? "<th>Consensus</th>" : ""}<th>Best price</th><th>Median implied %</th><th>Coverage</th></tr></thead>
-          <tbody>${names.map(n => consensusRow(n, gameLinesModel[key][n], showPoint)).join("")}</tbody>
-        </table></div>
-      </div>`);
-  });
-  return blocks.join("");
-}
-
-/* filters + scoring controls (step 10) */
-function renderBoardFilters(){
-  const el = document.getElementById("board-filters");
-  el.style.display = "flex";
-  el.className = "board-filters";
-  el.innerHTML = `
-    <div class="field">
-      <label for="filter-mode">Show</label>
-      <select id="filter-mode" onchange="boardFilterState.mode = this.value; renderBoard();">
-        <option value="all">All rows</option>
-        <option value="flagged">Line drift flags only</option>
-        <option value="edges">Model edges only</option>
-      </select>
-    </div>
-    <div class="field narrow">
-      <label for="filter-gap">Min gap</label>
-      <input type="number" id="filter-gap" step="0.5" value="${boardFilterState.minGap}"
-        onchange="boardFilterState.minGap = parseFloat(this.value) || 0; renderBoard();">
-    </div>
-    <button class="btn ghost" id="btn-score" onclick="scoreBoard()">Score board with projections</button>
-    <span class="dim" id="score-status" style="font-size:12.5px"></span>`;
-  document.getElementById("filter-mode").value = boardFilterState.mode;
-}
-
-function visibleRows(rows){
-  const st = boardFilterState;
-  if (st.mode === "flagged") return rows.filter(r => r.flagged);
-  if (st.mode === "edges") return rows.filter(r => r.gap != null && Math.abs(r.gap) >= st.minGap);
-  return rows;
-}
-
-function renderBoard(){
-  if (!boardModel){ return; }
-  const out = [];
-  const gameLinesHtml = renderGameLinesHtml();
-  if (gameLinesHtml) out.push(gameLinesHtml);
-  let anyRows = !!gameLinesHtml;
-  Object.entries(boardModel).forEach(([mktKey, rows]) => {
-    const cfg = SITE_CONFIG.markets[mktKey];
-    const vis = visibleRows(rows);
-    if (!vis.length) return;
-    anyRows = true;
-    const scored = rows.some(r => r.proj != null);
-    out.push(`
-      <div class="market-block">
-        <h2>${cfg.label}</h2>
-        <p class="mkt-note">${vis.length} of ${rows.length} player${rows.length===1?"":"s"} shown · flags fire when books sit ${cfg.drift}+ apart on the line</p>
-        <div class="table-scroll"><table>
-          <thead><tr>
-            <th>Player</th><th>Consensus</th><th>Move</th><th>Range</th><th>Best over</th><th>Best under</th><th>No-vig over %</th>
-            ${scored ? "<th>Model proj</th><th>Gap</th>" : ""}
-            <th>Flag</th><th></th>
-          </tr></thead>
-          <tbody>
-          ${vis.map(r => boardRowHtml(r, cfg, scored)).join("")}
-          </tbody>
-        </table></div>
-      </div>`);
-  });
-  document.getElementById("board-results").innerHTML = anyRows ? out.join("") :
-    `<div class="panel empty"><strong>Nothing matches this view.</strong><br>Loosen the filters, or if the game came back empty, books usually hang player props a few days out. For future-season games, turn on the game-lines chips: moneyline, spread and total post months before props do.</div>`;
-}
-function boardRowHtml(r, cfg, scored){
-  const moveCell = r.move === 0 || r.open == null
-    ? `<span class="dim mono" style="font-size:12px">—</span>`
-    : `<span class="${r.move > 0 ? "move-up" : "move-down"}" title="Opened ${r.open} when you first pulled this board" style="font-size:12.5px">${r.move > 0 ? "▲" : "▼"} ${Math.abs(r.move)}</span>`;
-  let projCells = "";
-  if (scored){
-    if (r.proj != null){
-      const gapCls = r.gap >= 0 ? "gap-pos" : "gap-neg";
-      projCells = `<td class="num">${r.proj.toFixed(1)}${r.projProb != null ? ` <span class="dim" style="font-size:11px">(${pct(r.projProb,0)} over)</span>` : ""}</td>
-                   <td class="num ${gapCls}">${r.gap >= 0 ? "+" : ""}${r.gap.toFixed(1)}</td>`;
-    } else {
-      projCells = `<td class="num dim">—</td><td class="num dim">—</td>`;
-    }
-  }
-  return `<tr>
-    <td class="player-cell">${escapeHtml(r.player)}</td>
-    <td class="num">${r.cons}</td>
-    <td>${moveCell}</td>
-    <td class="num dim">${r.lo === r.hi ? r.lo : r.lo + " – " + r.hi}</td>
-    <td class="num">${r.bestOver ? `<span class="price-up">${fmtAmerican(r.bestOver.price)}</span> <span class="dim">(${r.bestOver.point})</span><span class="book-tag">${escapeHtml(r.bestOver.book)}</span>` : "—"}</td>
-    <td class="num">${r.bestUnder ? `<span class="price-down">${fmtAmerican(r.bestUnder.price)}</span> <span class="dim">(${r.bestUnder.point})</span><span class="book-tag">${escapeHtml(r.bestUnder.book)}</span>` : "—"}</td>
-    <td class="num">${r.noVig != null ? pct(r.noVig) : "—"}</td>
-    ${projCells}
-    <td>${r.flagged ? `<span class="pill hot" title="${escapeHtml(r.driftNote)}">line drift</span>` : ""}</td>
-    <td style="white-space:nowrap">
-      <button class="btn ghost small" onclick='sendToAnalyzer(${jsAttr(r.player)}, "${r.mktKey}", ${r.cons})'>Analyze</button>
-      <button class="btn ghost small" onclick='quickLog(${jsAttr(r.player)}, "${r.mktKey}", ${r.cons}, ${r.bestOver ? r.bestOver.price : -110})'>Log</button>
-    </td>
-  </tr>`;
-}
-
-/* score the board: fetch gamelogs and project every row (step 10 wiring of step 5) */
-let scoringActive = false;
-async function scoreBoard(){
-  if (!boardModel || scoringActive) return;
-  scoringActive = true;
-  const btn = document.getElementById("btn-score");
-  const status = document.getElementById("score-status");
-  btn.disabled = true;
-  const season = guessSeason(currentEvent ? currentEvent.commence_time : null);
-  await loadDefenseData(season);
-
-  // opponent per player is unknown from odds alone; use the game's two teams and
-  // apply the softer assumption: skip defense factor on the board, weather only.
-  // Defense factor applies in the analyzer where you pick the opponent explicitly.
-  const rows = [];
-  Object.values(boardModel).forEach(list => list.forEach(r => rows.push(r)));
-  const capped = rows.slice(0, SITE_CONFIG.model.boardScoreCap);
-  let done = 0, failed = 0;
-  for (const r of capped){
-    status.textContent = `Scoring ${++done} of ${capped.length}: ${r.player}`;
-    try {
-      const cfg = SITE_CONFIG.markets[r.mktKey];
-      const pid = await resolvePlayerId(r.player);
-      if (!pid) { failed++; continue; }
-      const games = await getGamelog(pid, season - 1 >= 2023 && isEarlySeason() ? season - 1 : season, cfg.espn);
-      // fall back to prior season if current season has too few games
-      let usable = games;
-      if (usable.length < SITE_CONFIG.model.minGamesForProb){
-        usable = await getGamelog(pid, season - 1, cfg.espn);
-      }
-      if (usable.length < SITE_CONFIG.model.minGamesForProb){ failed++; continue; }
-      const w = currentWeather && !currentWeather.dome ? currentWeather : null;
-      const p = project(usable, { oppAbbr: null, wind: w ? w.wind : null, precipProb: w ? w.precipProb : null, kind: cfg.kind });
-      if (!p){ failed++; continue; }
-      r.proj = p.proj;
-      r.projProb = projOverProb(p, r.cons);
-      r.gap = p.proj - r.cons;
-    } catch(e){ failed++; }
-    await new Promise(res => setTimeout(res, 250)); // stay polite to ESPN
-  }
-  status.textContent = `Scored ${done - failed} of ${capped.length} players` + (failed ? ` (${failed} skipped: no data)` : "") +
-    (rows.length > capped.length ? ` · capped at ${SITE_CONFIG.model.boardScoreCap}` : "") +
-    ". Defense factor applies only in the analyzer where you pick the opponent.";
-  renderBoard();
-  btn.disabled = false;
-  scoringActive = false;
-}
-function isEarlySeason(){
-  const m = new Date().getMonth(); // Mar-Aug: previous season is the meaningful sample
-  return m >= 2 && m <= 7;
-}
-
-/* board -> analyzer handoff */
-function sendToAnalyzer(playerName, mktKey, line){
-  const cfg = SITE_CONFIG.markets[mktKey];
-  showView("analyzer");
-  document.getElementById("stat-select").value = cfg.espn;
-  document.getElementById("line-input").value = line;
-  // prefill opponent and wind from the loaded game
-  if (currentEvent){
-    const homeAbbr = (SITE_CONFIG.stadiums[currentEvent.home_team]||{}).abbr;
-    const awayAbbr = (SITE_CONFIG.stadiums[currentEvent.away_team]||{}).abbr;
-    // opponent unknown per player; leave blank but stash both for the hint
-    document.getElementById("opp-select").value = "";
-    if (currentWeather && !currentWeather.dome && currentWeather.wind != null){
-      document.getElementById("wind-input").value = Math.round(currentWeather.wind);
-    } else {
-      document.getElementById("wind-input").value = "";
-    }
-    void homeAbbr; void awayAbbr;
-  }
-  const input = document.getElementById("player-search");
-  input.value = playerName;
-  searchPlayers(playerName, true);
-}
-function quickLog(playerName, mktKey, line, odds){
-  showView("log");
-  document.getElementById("lf-player").value = playerName;
-  document.getElementById("lf-market").value = mktKey;
-  document.getElementById("lf-line").value = line;
-  document.getElementById("lf-odds").value = odds;
 }
 
 /* ============================================================
@@ -1351,6 +1718,171 @@ function runDevig(){
       </table></div>
       <p class="dim" style="font-size:12px;padding:10px 16px">Fair price is what the odds would be with the juice removed, assuming this book's list. Paste a second book's list and compare fair prices to spot which book is short on your player. If the overround runs above roughly 20%, futures at this book are expensive to hold.</p>
     </div>`;
+}
+
+/* ============================================================
+   Game breakdown: full box score, home/away, all player stats
+   ============================================================ */
+const GB_CAT_STAT = { passing: "passingYards", rushing: "rushingYards", receiving: "receivingYards" };
+const GB_CAT_LABEL = { passing: "Passing", rushing: "Rushing", receiving: "Receiving", fumbles: "Fumbles",
+  defensive: "Defense", interceptions: "Interceptions", kicking: "Kicking", punting: "Punting",
+  kickReturns: "Kick returns", puntReturns: "Punt returns" };
+let breakdownGames = [];
+
+function gbStatus(html){ document.getElementById("gb-status").innerHTML = html || ""; }
+
+async function loadScoreboard(){
+  const season = document.getElementById("gb-season").value;
+  const week = document.getElementById("gb-week").value;
+  const btn = document.getElementById("btn-gb-games");
+  btn.disabled = true;
+  gbStatus(`<div class="loading-row"><span class="spinner"></span> Loading week ${escapeHtml(week)} of ${escapeHtml(season)}...</div>`);
+  try {
+    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=${encodeURIComponent(week)}&dates=${encodeURIComponent(season)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("scoreboard HTTP "+res.status);
+    const data = await res.json();
+    breakdownGames = parseScoreboard(data);
+    const sel = document.getElementById("gb-game");
+    if (!breakdownGames.length){
+      sel.innerHTML = `<option value="">No games found</option>`;
+      gbStatus(`<div class="note">No games came back for that week and season. Try a different week.</div>`);
+    } else {
+      sel.innerHTML = `<option value="">Pick a game</option>` + breakdownGames.map(g =>
+        `<option value="${g.id}">${escapeHtml(g.away)} @ ${escapeHtml(g.home)}${g.completed ? ` · ${g.awayScore}-${g.homeScore}` : " · not final"}</option>`).join("");
+      document.getElementById("btn-gb-load").disabled = false;
+      gbStatus("");
+    }
+  } catch(e){
+    gbStatus(`<div class="note err">Could not load games (${escapeHtml(e.message)}). Deploy the site first; ESPN blocks requests from a local file.</div>`);
+  } finally { btn.disabled = false; }
+}
+
+function parseScoreboard(data){
+  return (data.events || []).map(ev => {
+    const comp = (ev.competitions && ev.competitions[0]) || {};
+    const cs = comp.competitors || [];
+    const home = cs.find(c => c.homeAway === "home") || {};
+    const away = cs.find(c => c.homeAway === "away") || {};
+    const status = (comp.status && comp.status.type) || (ev.status && ev.status.type) || {};
+    return {
+      id: ev.id,
+      date: ev.date ? new Date(ev.date) : null,
+      home: home.team ? (home.team.displayName || home.team.shortDisplayName) : "",
+      away: away.team ? (away.team.displayName || away.team.shortDisplayName) : "",
+      homeScore: home.score, awayScore: away.score,
+      completed: !!status.completed
+    };
+  }).filter(g => g.id);
+}
+
+async function loadBreakdown(){
+  const id = document.getElementById("gb-game").value;
+  if (!id){ gbStatus(`<div class="note err">Pick a game first.</div>`); return; }
+  const btn = document.getElementById("btn-gb-load");
+  btn.disabled = true;
+  document.getElementById("gb-results").innerHTML = "";
+  gbStatus(`<div class="loading-row"><span class="spinner"></span> Pulling the full box score...</div>`);
+  try {
+    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${encodeURIComponent(id)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("summary HTTP "+res.status);
+    const data = await res.json();
+    const bx = parseBoxscore(data);
+    if (!bx.teams.length){
+      gbStatus("");
+      document.getElementById("gb-results").innerHTML = `<div class="panel empty"><strong>No box score available for this game.</strong><br>Player stats appear once a game is final. Pick a completed game.</div>`;
+      return;
+    }
+    renderBreakdown(bx);
+    gbStatus("");
+  } catch(e){
+    gbStatus(`<div class="note err">Could not pull the box score: ${escapeHtml(e.message)}.</div>`);
+  } finally { btn.disabled = false; }
+}
+
+function parseBoxscore(data){
+  const header = data.header || {};
+  const comp = (header.competitions && header.competitions[0]) || {};
+  const competitors = comp.competitors || [];
+  const scoreByAbbr = {}, haByAbbr = {};
+  competitors.forEach(c => {
+    const abbr = c.team ? c.team.abbreviation : "";
+    scoreByAbbr[abbr] = c.score;
+    haByAbbr[abbr] = c.homeAway;
+  });
+  const playerBlocks = (data.boxscore && data.boxscore.players) || [];
+  const teams = playerBlocks.map(tp => {
+    const abbr = tp.team ? tp.team.abbreviation : "";
+    return {
+      abbr,
+      name: tp.team ? (tp.team.displayName || abbr) : abbr,
+      homeAway: haByAbbr[abbr] || "",
+      score: scoreByAbbr[abbr] != null ? scoreByAbbr[abbr] : "",
+      categories: (tp.statistics || []).map(s => ({
+        name: s.name,
+        labels: s.labels || [],
+        athletes: (s.athletes || []).map(a => ({
+          id: a.athlete ? a.athlete.id : null,
+          name: a.athlete ? (a.athlete.displayName || "") : "",
+          stats: a.stats || []
+        })).filter(a => a.name)
+      })).filter(c => c.athletes.length)
+    };
+  });
+  if (teams.length === 2){ teams[0].opp = teams[1].abbr; teams[1].opp = teams[0].abbr; }
+  const gi = data.gameInfo || {};
+  const venue = (gi.venue && gi.venue.fullName) || (comp.venue && comp.venue.fullName) || "";
+  let weather = "";
+  if (gi.weather){
+    const w = gi.weather;
+    weather = [w.temperature != null ? w.temperature + "°F" : "", w.displayValue || ""].filter(Boolean).join(" · ");
+  }
+  return { teams, venue, weather };
+}
+
+function renderBreakdown(bx){
+  const scoreLine = bx.teams.map(t => `${escapeHtml(t.abbr)} ${t.score}`).join(" – ");
+  const meta = [scoreLine, bx.venue ? escapeHtml(bx.venue) : "", bx.weather ? escapeHtml(bx.weather) : ""].filter(Boolean).join(" · ");
+  const blocks = bx.teams.map(team => {
+    const badge = team.homeAway === "home" ? `<span class="pill up">home</span>` : team.homeAway === "away" ? `<span class="pill">away</span>` : "";
+    const cats = team.categories.map(cat => {
+      const label = GB_CAT_LABEL[cat.name] || (cat.name.charAt(0).toUpperCase() + cat.name.slice(1));
+      const analyzeStat = GB_CAT_STAT[cat.name];
+      return `
+        <div style="margin-top:14px">
+          <h3 style="font-size:15px;margin-bottom:6px">${escapeHtml(label)}</h3>
+          <div class="table-scroll"><table>
+            <thead><tr><th>Player</th>${cat.labels.map(l => `<th>${escapeHtml(l)}</th>`).join("")}${analyzeStat ? "<th></th>" : ""}</tr></thead>
+            <tbody>
+            ${cat.athletes.map(a => `<tr>
+              <td class="player-cell">${escapeHtml(a.name)}</td>
+              ${a.stats.map(s => `<td class="num">${escapeHtml(String(s))}</td>`).join("")}
+              ${analyzeStat ? `<td><button class="btn ghost small" onclick='breakdownToAnalyzer(${jsAttr(a.name)}, ${jsAttr(a.id)}, "${analyzeStat}", ${jsAttr(team.opp || "")})'>Analyze</button></td>` : ""}
+            </tr>`).join("")}
+            </tbody>
+          </table></div>
+        </div>`;
+    }).join("");
+    return `
+      <div class="market-block">
+        <h2 style="display:flex;align-items:center;gap:10px">${escapeHtml(team.name)} ${badge} <span class="dim mono" style="font-size:14px">${team.score !== "" ? team.score + " pts" : ""}</span></h2>
+        ${cats || `<p class="mkt-note">No player stats in the feed for this team.</p>`}
+      </div>`;
+  }).join("");
+  document.getElementById("gb-results").innerHTML =
+    `<div class="weather-banner" style="margin:6px 0 16px"><div class="w-item"><span class="k">Final</span><span class="v">${meta}</span></div></div>` + blocks;
+}
+
+function breakdownToAnalyzer(name, id, espnStat, oppAbbr){
+  showView("analyzer");
+  if (id) pickPlayer({ id: String(id), name, team: "", img: `https://a.espncdn.com/i/headshots/nfl/players/full/${id}.png` });
+  else { document.getElementById("player-search").value = name; searchPlayers(name, false); }
+  document.getElementById("stat-select").value = espnStat;
+  if (oppAbbr) document.getElementById("opp-select").value = oppAbbr;
+  const li = document.getElementById("line-input");
+  li.value = "";
+  li.focus();
 }
 
 /* ============================================================
@@ -1906,7 +2438,12 @@ checkKeyWarning();
 renderChecklist();
 populateOpponentSelect();
 populateLogMarketSelect();
+(function(){
+  const wk = document.getElementById("gb-week");
+  if (wk) wk.innerHTML = Array.from({length:18},(_,i)=>`<option value="${i+1}"${i===0?" selected":""}>Week ${i+1}</option>`).join("");
+})();
 (function(){ const k = lsGet("edgeboard_odds_key"); if (k) document.getElementById("api-key-input").value = k; })();
+(function(){ const t = document.getElementById("autoload-toggle"); if (t) t.checked = getAutoLoad(); })();
 </script>
 </body>
 </html>
