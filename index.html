@@ -488,6 +488,9 @@ button.rate{cursor:pointer}
         <p><strong>Futures.</strong> Team outrights come off the same odds feed. The no-vig market % normalizes every book's full field to 100%, and a value flag means the best available price beats that consensus. Player award futures are not on the free feed, so the futures tab includes a calculator that strips the vig from any list you paste from a book.</p>
         <p><strong>The rating.</strong> Each prop's signed percentage is the blend's probability minus the implied probability of the best available price, shown for whichever side is stronger. The blend is 55% model projection and 45% historical hit rate, then shrunk toward the market's no-vig opinion based on sample size; the market always keeps at least 40% of the say, and thin samples lean on it harder. Green positive means edge to you at that price, red negative means the book has you. Ratings past ±15% almost always mean stale or mismatched data, so verify before trusting one. Team prop ratings are market-based only: fair probability against the best price, with no player model behind them.</p>
         <p><strong>Usage data.</strong> Player ratings also fold in an nflverse usage trend: a player whose recent targets, carries, or attempts run above their season norm gets a small projection boost, capped at ±8%. If the usage file fails to load, ratings still work without it.</p>
+        <p><strong>Injuries.</strong> Official ESPN injury designations gate every rating. Out, doubtful, IR, PUP or suspended players show a red status pill instead of a rating, since a prop on an unavailable player is dead money. Questionable players keep their rating but are capped at low confidence and tagged with a Q.</p>
+        <p><strong>Defense, upgraded.</strong> When usage data is loaded, the defense adjustment is stat-specific: passing yards allowed for passing props, receiving yards or receptions allowed for receiving props, and so on, built from every player's production against that defense, capped at ±10%. Without it, the points-allowed proxy still applies. The detail row shows which source was used.</p>
+        <p><strong>Game script and steam.</strong> If team props are loaded for a game, the market's own spread and total nudge player projections: big underdogs lean pass, big favorites lean run, and high totals add volume, capped at ±8% combined. Lines that move meaningfully between your pulls get a steam badge showing direction and size.</p>
         <label style="display:flex;align-items:center;gap:10px;margin:8px 0 0;text-transform:none;font-family:var(--sans);font-size:13.5px;letter-spacing:0;color:var(--chalk)">
           <input type="checkbox" id="autoload-toggle" style="width:16px;height:16px;accent-color:var(--amber)" onchange="setAutoLoad(this.checked)">
           Auto-load props for every game when a week loads (roughly 15 to 30 credits per week view; suited to the paid tier)
@@ -1191,12 +1194,19 @@ function renderPlayerPropsHtml(espnId, rows, progress){
         <tbody>
         ${vis.map(r => {
           const did = `d-${espnId}-${mktKey}-${r.player.replace(/[^a-z0-9]/gi,"")}`;
+          const steam = r.move && Math.abs(r.move) >= cfg.drift ? ` <span class="pill hot" style="font-size:9.5px" title="Line moved ${r.move>0?"up":"down"} ${Math.abs(r.move)} since you first saw ${r.open}">steam ${r.move>0?"▲":"▼"}${Math.abs(r.move)}</span>` : "";
+          const injPill = r.injury ? (r.injury.sev === "out"
+            ? `<span class="pill down" title="${escapeHtml(r.injury.status)}">${/reserve|ir/i.test(r.injury.status) ? "IR" : /doubt/i.test(r.injury.status) ? "DOUBT" : "OUT"}</span>`
+            : ` <span class="pill hot" style="font-size:9.5px" title="${escapeHtml(r.injury.status)}">Q</span>`) : "";
+          const ratingCell = r.injury && r.injury.sev === "out"
+            ? injPill
+            : (r.rating != null ? rateChipHtml(r.rating, did, r.side) : (r.rated === false ? `<span class="pill">no data</span>` : `<span class="dim mono" style="font-size:11px">…</span>`));
           return `<tr>
-            <td class="player-cell" title="${r.flagged ? "Line drift: " + escapeHtml(r.driftNote) : ""}">${escapeHtml(r.player)}${r.flagged ? ` <span class="pill hot" style="font-size:9.5px">drift</span>` : ""}</td>
+            <td class="player-cell" title="${r.flagged ? "Line drift: " + escapeHtml(r.driftNote) : ""}">${escapeHtml(r.player)}${r.injury && r.injury.sev !== "out" ? injPill : ""}${r.flagged ? ` <span class="pill hot" style="font-size:9.5px">drift</span>` : ""}${steam}</td>
             <td class="num" title="Range ${r.lo}–${r.hi}">${r.cons}</td>
             <td class="num">${r.bestOver ? `<span class="price-up">${fmtAmerican(r.bestOver.price)}</span> <span class="dim">(${r.bestOver.point})</span><span class="book-tag">${escapeHtml(r.bestOver.book)}</span>` : "—"}</td>
             <td class="num">${r.bestUnder ? `<span class="price-down">${fmtAmerican(r.bestUnder.price)}</span> <span class="dim">(${r.bestUnder.point})</span><span class="book-tag">${escapeHtml(r.bestUnder.book)}</span>` : "—"}</td>
-            <td>${r.rating != null ? rateChipHtml(r.rating, did, r.side) : (r.rated === false ? `<span class="pill">no data</span>` : `<span class="dim mono" style="font-size:11px">…</span>`)}</td>
+            <td>${ratingCell}</td>
             <td>${r.conf ? confTag(r.conf) : ""}</td>
             <td style="white-space:nowrap">
               <button class="btn ghost small" onclick='sendToAnalyzer(${jsAttr(r.player)}, "${mktKey}", ${r.cons})'>Analyze</button>
@@ -1221,7 +1231,8 @@ function detailHtml(r){
     <span><b>Market fair</b> ${fmtP(d.pFair)}</span>
     <span><b>Blend</b> ${fmtP(d.pFinal)} on the ${r.side || "over"}</span>
     <span><b>Usage</b> ${d.usage != null ? (d.usage >= 1 ? "+" : "") + ((d.usage-1)*100).toFixed(1) + "%" : "n/a"}</span>
-    <span><b>Defense</b> ${d.def != null ? (d.def >= 1 ? "+" : "") + ((d.def-1)*100).toFixed(1) + "%" + (d.opp ? " vs " + escapeHtml(d.opp) : "") : "neutral"}</span>
+    <span><b>Defense</b> ${d.def != null ? (d.def >= 1 ? "+" : "") + ((d.def-1)*100).toFixed(1) + "%" + (d.opp ? " vs " + escapeHtml(d.opp) : "") + (d.defSrc === "stat" ? " (stat-specific)" : d.defSrc === "pts" ? " (pts proxy)" : "") : "neutral"}</span>
+    <span><b>Script</b> ${d.script != null ? ((d.script >= 1 ? "+" : "") + ((d.script-1)*100).toFixed(1) + "%" + (d.spread != null ? " · spread " + (d.spread > 0 ? "+" : "") + d.spread : "") + (d.total != null ? " · total " + d.total : "")) : "n/a (load team props)"}</span>
     <span><b>Weather</b> ${d.weather != null && d.weather < 1 ? "−" + ((1-d.weather)*100).toFixed(0) + "%" : "neutral"}</span>
     <span><b>Season</b> ${d.season || "—"}</span>
   </div>`;
@@ -1254,7 +1265,8 @@ async function scoreCardPlayers(espnId){
   cm.scoring = true;
   const g = cm.g;
   const statsSeason = pickStatsSeason(g.date);
-  await Promise.all([loadDefenseData(statsSeason), ensureNflverse(statsSeason)]);
+  await Promise.all([loadDefenseData(statsSeason), ensureNflverse(statsSeason), ensureInjuries()]);
+  cm.script = buildScriptCtx(cm.team);
   const homeAbbr = (SITE_CONFIG.stadiums[g.home] || {}).abbr;
   const awayAbbr = (SITE_CONFIG.stadiums[g.away] || {}).abbr;
   const rows = cm.player.slice(0, SITE_CONFIG.model.boardScoreCap * 2);
@@ -1272,6 +1284,12 @@ async function scoreCardPlayers(espnId){
 }
 async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
   const cfg = SITE_CONFIG.markets[r.mktKey];
+  // injury gate first: no rating for players ruled out or worse
+  const inj = injuryFor(r.player);
+  if (inj){
+    r.injury = { status: inj.status, sev: injurySeverity(inj.status) };
+    if (r.injury.sev === "out"){ r.rated = false; return; }
+  }
   const pid = await resolvePlayerId(r.player);
   if (!pid){ r.rated = false; return; }
   let season = statsSeason;
@@ -1292,13 +1310,28 @@ async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
   let pModel = null, det = { pHist, n, season, pFair: r.noVig };
   if (n >= 2){
     const teamAbbr = nflvTeamFor(r.player);
-    const opp = teamAbbr ? (normAbbr(teamAbbr) === homeAbbr ? awayAbbr : normAbbr(teamAbbr) === awayAbbr ? homeAbbr : null) : null;
+    const playerTeamNorm = teamAbbr ? normAbbr(teamAbbr) : null;
+    const opp = playerTeamNorm ? (abbrMatch(playerTeamNorm, homeAbbr) ? awayAbbr : abbrMatch(playerTeamNorm, awayAbbr) ? homeAbbr : null) : null;
     const usage = nflvUsageFactor(r.player, cfg.espn);
+    // defense: stat-specific from nflverse first, points-allowed proxy as fallback
+    const statDef = nflvDefenseFactor(opp, cfg.espn);
     const w = cm.weather && !cm.weather.dome ? cm.weather : null;
-    const p = project(games, { oppAbbr: opp, wind: w ? w.wind : null, precipProb: w ? w.precipProb : null, kind: cfg.kind, usageFactor: usage });
+    // game script from the market's spread and total (needs team props loaded)
+    let script = 1;
+    if (cm.script){
+      const g = cm.g;
+      const teamFull = playerTeamNorm ? (abbrMatch(playerTeamNorm, homeAbbr) ? g.home : abbrMatch(playerTeamNorm, awayAbbr) ? g.away : null) : null;
+      const spread = teamFull != null && cm.script.spreadByTeam[teamFull] != null ? cm.script.spreadByTeam[teamFull] : null;
+      script = scriptFactor(cfg.kind, spread, cm.script.total);
+      det.script = script; det.spread = spread; det.total = cm.script.total;
+    }
+    const p = project(games, { oppAbbr: statDef ? null : opp, wind: w ? w.wind : null, precipProb: w ? w.precipProb : null,
+                               kind: cfg.kind, usageFactor: usage * (statDef ? statDef.factor : 1) * script });
     if (p){
       pModel = projOverProb(p, r.cons);
-      det.proj = p.proj; det.usage = usage; det.def = p.def ? p.def.factor : null; det.opp = opp; det.weather = p.weather;
+      det.proj = p.proj; det.usage = usage; det.opp = opp; det.weather = p.weather;
+      det.def = statDef ? statDef.factor : (p.def ? p.def.factor : null);
+      det.defSrc = statDef ? "stat" : "pts";
     }
   }
   det.pModel = pModel;
@@ -1312,6 +1345,7 @@ async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
   else { r.rating = edgeUnder; r.side = "Under"; }
   const books = r.books ? r.books.length : 0;
   r.conf = (n >= 10 && books >= 3) ? "High" : (n >= 6 && books >= 2) ? "Medium" : "Low";
+  if (r.injury && r.injury.sev === "q") r.conf = "Low";   // questionable caps confidence
   r.rated = true;
   r.detail = det;
 }
@@ -1357,6 +1391,60 @@ function getAutoLoad(){ return lsGet("edgeboard_autoload") === "1"; }
 function setAutoLoad(v){ lsSet("edgeboard_autoload", v ? "1" : "0"); }
 
 /* ============================================================
+   Injury reports (ESPN, structured official designations)
+   ============================================================ */
+let injIndex = { t: 0, byName: {} };
+async function ensureInjuries(){
+  if (Date.now() - injIndex.t < 60*60*1000 && Object.keys(injIndex.byName).length) return;
+  try {
+    const res = await fetch("https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries");
+    if (!res.ok) return;
+    const data = await res.json();
+    const byName = {};
+    const walk = arr => (arr || []).forEach(team => {
+      (team.injuries || []).forEach(it => {
+        const name = it.athlete ? (it.athlete.displayName || "") : (it.displayName || "");
+        const status = it.status || (it.type && it.type.description) || "";
+        if (name && status) byName[name] = { status, note: it.shortComment || it.longComment || "" };
+      });
+    });
+    walk(data.injuries);
+    if (Array.isArray(data.items)) walk(data.items);
+    if (Object.keys(byName).length) injIndex = { t: Date.now(), byName };
+  } catch(e){ /* ratings proceed without injury data */ }
+}
+function injuryFor(name){ return injIndex.byName[name] || null; }
+function injurySeverity(status){
+  if (!status) return null;
+  if (/out|injured reserve|\bir\b|pup|suspend|doubtful/i.test(status)) return "out";
+  if (/questionable/i.test(status)) return "q";
+  return "note";
+}
+
+/* game script factor from the market's own spread and total */
+function scriptFactor(kind, teamSpread, total){
+  let f = 1;
+  if (teamSpread != null){
+    if (kind === "pass"){ if (teamSpread >= 6.5) f *= 1.04; else if (teamSpread <= -6.5) f *= 0.97; }
+    else { if (teamSpread <= -6.5) f *= 1.04; else if (teamSpread >= 6.5) f *= 0.96; }
+  }
+  if (total != null){ if (total >= 51) f *= 1.03; else if (total <= 41) f *= 0.97; }
+  return clamp(f, 0.92, 1.08);
+}
+function buildScriptCtx(team){
+  // needs team props loaded; returns { spreadByTeam: {fullName: pts}, total }
+  if (!team || !team.lines) return null;
+  const ctx = { spreadByTeam: {}, total: null };
+  Object.entries(team.lines.spreads || {}).forEach(([name, entries]) => {
+    const pts = entries.map(e => e.point).filter(p => p != null);
+    if (pts.length) ctx.spreadByTeam[name] = median(pts);
+  });
+  const overs = ((team.lines.totals || {}).Over || []).map(e => e.point).filter(p => p != null);
+  if (overs.length) ctx.total = median(overs);
+  return (Object.keys(ctx.spreadByTeam).length || ctx.total != null) ? ctx : null;
+}
+
+/* ============================================================
    nflverse usage layer (free weekly stats: targets, carries, attempts)
    ============================================================ */
 let nflv = { state: "idle", year: null, byName: {} };
@@ -1400,27 +1488,73 @@ function indexNflverse(csvText){
   const cWeek = col("week");
   const cSt = col("season_type");
   const cTgt = col("targets"), cCar = col("carries"), cAtt = col("attempts");
+  const cOpp = col("opponent_team");
+  const DEF_METRICS = { passing_yards: col("passing_yards"), rushing_yards: col("rushing_yards"),
+    receiving_yards: col("receiving_yards"), receptions: col("receptions"), attempts: cAtt, carries: cCar };
   if (cName === -1 || cWeek === -1) return false;
   const byName = {};
+  const defAcc = {}; // defTeam -> metric -> { week -> sum }
   for (let i = 1; i < lines.length; i++){
     if (!lines[i]) continue;
     const f = parseCsvLine(lines[i]);
     if (cSt !== -1 && f[cSt] && f[cSt] !== "REG") continue;
     const name = f[cName];
     if (!name) continue;
+    const wk = parseInt(f[cWeek], 10) || 0;
     const rec = byName[name] = byName[name] || { team: null, weeks: [] };
     rec.team = (cTeam !== -1 && f[cTeam]) || rec.team;
     rec.weeks.push({
-      week: parseInt(f[cWeek], 10) || 0,
+      week: wk,
       targets: cTgt !== -1 ? (parseFloat(f[cTgt]) || 0) : null,
       carries: cCar !== -1 ? (parseFloat(f[cCar]) || 0) : null,
       attempts: cAtt !== -1 ? (parseFloat(f[cAtt]) || 0) : null
     });
+    // defense-allowed accumulation: this player's production counts against the opponent
+    if (cOpp !== -1 && f[cOpp]){
+      const opp = f[cOpp];
+      const d = defAcc[opp] = defAcc[opp] || {};
+      Object.entries(DEF_METRICS).forEach(([metric, ci]) => {
+        if (ci === -1) return;
+        const v = parseFloat(f[ci]) || 0;
+        const m = d[metric] = d[metric] || {};
+        m[wk] = (m[wk] || 0) + v;
+      });
+    }
   }
   Object.values(byName).forEach(r => r.weeks.sort((a,b)=>a.week-b.week));
   if (!Object.keys(byName).length) return false;
   nflv.byName = byName;
+  // finalize: per-game allowed averages + league averages
+  const defAllowed = {}, leagueSums = {}, leagueCounts = {};
+  Object.entries(defAcc).forEach(([team, metrics]) => {
+    defAllowed[team] = {};
+    Object.entries(metrics).forEach(([metric, weeks]) => {
+      const vals = Object.values(weeks);
+      if (!vals.length) return;
+      const avg = mean(vals);
+      defAllowed[team][metric] = avg;
+      leagueSums[metric] = (leagueSums[metric] || 0) + avg;
+      leagueCounts[metric] = (leagueCounts[metric] || 0) + 1;
+    });
+  });
+  const leagueAvg = {};
+  Object.keys(leagueSums).forEach(m => { leagueAvg[m] = leagueSums[m]/leagueCounts[m]; });
+  nflv.defAllowed = defAllowed;
+  nflv.defLeague = leagueAvg;
   return true;
+}
+const ESPN_STAT_TO_DEF = { passingYards:"passing_yards", passingTouchdowns:"passing_yards",
+  completions:"passing_yards", passingAttempts:"attempts", interceptions:"passing_yards",
+  rushingYards:"rushing_yards", rushingAttempts:"carries",
+  receivingYards:"receiving_yards", receptions:"receptions", receivingTargets:"receptions" };
+function nflvDefenseFactor(oppAbbr, espnStat){
+  if (!oppAbbr || !nflv.defAllowed) return null;
+  const metric = ESPN_STAT_TO_DEF[espnStat];
+  if (!metric || !nflv.defLeague || !nflv.defLeague[metric]) return null;
+  const team = nflv.defAllowed[oppAbbr] || nflv.defAllowed[Object.keys(NFLV_ALIASES).find(k => NFLV_ALIASES[k] === oppAbbr) || ""] || nflv.defAllowed[NFLV_ALIASES[oppAbbr] || ""];
+  if (!team || team[metric] == null) return null;
+  const ratio = team[metric] / nflv.defLeague[metric];
+  return { factor: 1 + clamp((ratio - 1) * 0.5, -0.10, 0.10), allowed: team[metric], leagueAvg: nflv.defLeague[metric], metric };
 }
 function parseCsvLine(line){
   const out = []; let cur = "", inQ = false;
@@ -2054,7 +2188,7 @@ async function runAnalysis(){
   out.innerHTML = `<div class="panel loading-row"><span class="spinner"></span> Pulling ${escapeHtml(selectedPlayer.name)}'s ${season} gamelog...</div>`;
   let games;
   try {
-    await loadDefenseData(season);
+    await Promise.all([loadDefenseData(season), ensureInjuries()]);
     games = await getGamelog(selectedPlayer.id, season, statName);
   } catch(e){
     out.innerHTML = `<div class="panel empty"><strong>Could not load the gamelog.</strong><br>${escapeHtml(e.message)}. If you are previewing inside Claude, deploy the file or open it locally.</div>`;
@@ -2065,6 +2199,8 @@ async function runAnalysis(){
     return;
   }
   tickChecklist("gamelog");
+  const injA = injuryFor(selectedPlayer.name);
+  const injBanner = injA ? `<div class="note ${injurySeverity(injA.status) === "out" ? "err" : ""}" style="margin-bottom:14px"><strong>Injury report: ${escapeHtml(injA.status)}.</strong> ${escapeHtml(injA.note || "")} ${injurySeverity(injA.status) === "out" ? "A prop on a ruled-out player is dead money; this analysis is historical context only." : "Factor the designation in before trusting any edge here."}</div>` : "";
 
   const all = analyzeGames(games, line);
   const l5 = analyzeGames(games.slice(-5), line);
@@ -2119,7 +2255,7 @@ async function runAnalysis(){
 
   const rateCell = a => a && a.hitRate != null ? `${pct(a.hitRate,0)} <span class="dim mono" style="font-size:12px">(${a.over}/${a.n - a.push})</span>` : "—";
 
-  out.innerHTML = `
+  out.innerHTML = injBanner + `
     <div class="ticket">
       <div class="ticket-head">
         <div>
@@ -2245,14 +2381,29 @@ function runBacktest(){
     const actual = games[i].value;
     let outcome = "push";
     if (actual !== proxyLine) outcome = (pick === "Over") === (actual > proxyLine) ? "win" : "loss";
+    // blend pick: exactly the board's rating math against the proxy market (fair prob 0.5 by construction)
+    const pModel = projOverProb(p, proxyLine);
+    const allT = analyzeGames(trailing, proxyLine);
+    const l5T = analyzeGames(trailing.slice(-5), proxyLine);
+    const pHist = allT.hitRate != null ? (l5T.hitRate != null ? 0.6*allT.hitRate + 0.4*l5T.hitRate : allT.hitRate) : null;
+    const pBlend = blendProb(pModel, pHist, 0.5, trailing.length);
+    let bPick = null, bOutcome = null;
+    if (pBlend != null && Math.abs(pBlend - 0.5) > 0.001){
+      bPick = pBlend > 0.5 ? "Over" : "Under";
+      bOutcome = actual === proxyLine ? "push" : ((bPick === "Over") === (actual > proxyLine) ? "win" : "loss");
+    }
     results.push({ week: games[i].week, opp: games[i].opp, home: games[i].home, proxyLine, proj: p.proj, pick, actual, outcome,
-                   err: Math.abs(p.proj - actual) });
+                   bPick, bOutcome, err: Math.abs(p.proj - actual) });
   }
   const wins = results.filter(r => r.outcome === "win").length;
   const losses = results.filter(r => r.outcome === "loss").length;
   const pushes = results.filter(r => r.outcome === "push").length;
   const decided = wins + losses;
   const hit = decided ? wins/decided : null;
+  const bWins = results.filter(r => r.bOutcome === "win").length;
+  const bLosses = results.filter(r => r.bOutcome === "loss").length;
+  const bDecided = bWins + bLosses;
+  const bHit = bDecided ? bWins/bDecided : null;
   const mae = mean(results.map(r => r.err));
   const beatBreakeven = hit != null && hit > 0.524;
   tickChecklist("backtest");
@@ -2267,12 +2418,14 @@ function runBacktest(){
         <span class="pill ${beatBreakeven ? "up" : "down"}">${hit != null ? pct(hit,0) : "—"} hit rate</span>
       </div>
       <div class="stat-grid">
-        <div class="stat"><div class="k">Record</div><div class="v">${wins}-${losses}${pushes ? "-"+pushes : ""}</div></div>
-        <div class="stat hero"><div class="k">Pick hit rate</div><div class="v ${beatBreakeven?"pos":"neg"}">${hit != null ? pct(hit,0) : "—"}</div></div>
+        <div class="stat"><div class="k">Projection record</div><div class="v">${wins}-${losses}${pushes ? "-"+pushes : ""}</div></div>
+        <div class="stat hero"><div class="k">Projection hit rate</div><div class="v ${beatBreakeven?"pos":"neg"}">${hit != null ? pct(hit,0) : "—"}</div></div>
+        <div class="stat"><div class="k">Blend record</div><div class="v">${bDecided ? bWins+"-"+bLosses : "—"}</div></div>
+        <div class="stat"><div class="k">Blend hit rate</div><div class="v ${bHit != null && bHit > 0.524 ? "pos" : bHit != null ? "neg" : ""}">${bHit != null ? pct(bHit,0) : "—"}</div></div>
         <div class="stat"><div class="k">Breakeven at −110</div><div class="v"><small style="font-size:16px">52.4%</small></div></div>
         <div class="stat"><div class="k">Projection MAE</div><div class="v">${mae.toFixed(1)}</div></div>
       </div>
-      <div class="note" style="margin-bottom:14px">The proxy line is the player's trailing 10-game median, a stand-in for the market since historical closing props need a paid feed. Real books shade lines with injury and matchup info this test cannot see, so treat a strong result here as necessary, not sufficient. A weak result is a genuine red flag.</div>
+      <div class="note" style="margin-bottom:14px">The proxy line is the player's trailing 10-game median, a stand-in for the market since historical closing props need a paid feed. The blend row runs the board's exact rating math and abstains when it has no lean, so it usually makes fewer, more selective picks; that selectivity is the point. Real books shade lines with injury and matchup info this test cannot see, so treat a strong result here as necessary, not sufficient. A weak result is a genuine red flag.</div>
       <div class="table-scroll"><table>
         <thead><tr><th>Week</th><th>Opp</th><th>Proxy line</th><th>Model proj</th><th>Pick</th><th>Actual</th><th>Result</th></tr></thead>
         <tbody>
