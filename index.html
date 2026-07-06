@@ -3642,6 +3642,33 @@ populateLogMarketSelect();
 (function(){ const k = lsGet("edgeboard_odds_key"); if (k) document.getElementById("api-key-input").value = k; })();
 (function(){ const t = document.getElementById("autoload-toggle"); if (t) t.checked = getAutoLoad(); const bk = document.getElementById("bankroll-input"); if (bk) bk.value = getBankroll(); })();
 renderSlip();
+
+/* pick a sensible default season + week, then auto-load the game cards once on first paint */
+function defaultSeasonWeek(){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(); // 0=Jan
+  // NFL regular season runs roughly early Sept (m=8) through early Jan (m=0)
+  if (m >= 8){ // Sep-Dec: in season this year
+    const kickoff = new Date(y, 8, 5);
+    const wk = Math.min(18, Math.max(1, Math.floor((now - kickoff) / (7*24*3600*1000)) + 1));
+    return { season: y, week: wk };
+  }
+  if (m === 0){ return { season: y - 1, week: 18 }; } // early Jan: tail of last season
+  return { season: y, week: 1 }; // offseason: Week 1 of the upcoming season
+}
+(function autoLoadDefaultWeek(){
+  try {
+    const sSel = document.getElementById("wk-season");
+    const wSel = document.getElementById("wk-week");
+    if (!sSel || !wSel || typeof loadWeek !== "function") return;
+    const d = defaultSeasonWeek();
+    const hasOpt = (sel, val) => Array.prototype.some.call(sel.options || [], o => o.value === String(val));
+    if (hasOpt(sSel, d.season)) sSel.value = String(d.season);
+    populateWeekSelect();
+    if (hasOpt(wSel, d.week)) wSel.value = String(d.week);
+    loadWeek();
+  } catch(e){ /* board stays on manual load if anything is off */ }
+})();
 </script>
 </body>
 </html>
