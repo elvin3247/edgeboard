@@ -301,7 +301,7 @@ nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-v
 .seg button.on{background:var(--green);color:var(--field)}
 .seg button.on::after{display:none}
 /* live edge tape */
-.tape{background:var(--booth-2);border:1px solid var(--line);border-radius:10px;overflow:hidden;white-space:nowrap;padding:10px 0;margin:20px 0 4px}
+.tape{background:var(--booth-2);border:1px solid var(--line);border-radius:10px;overflow:hidden;white-space:nowrap;padding:10px 0;margin:0 0 22px}
 .tape-track{display:inline-block;animation:tapeScroll 34s linear infinite;will-change:transform}
 .tape .ti{display:inline-flex;align-items:center;gap:8px;margin:0 22px;font-family:var(--mono);font-size:12.5px}
 .tape .tk{color:var(--chalk-dim)} .tape .gr{color:var(--gold);font-weight:700} .tape .up{color:var(--green)} .tape .dn{color:var(--down)}
@@ -325,6 +325,30 @@ nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-v
 .switch input:checked + .track{background:var(--green-soft);border-color:rgba(0,212,106,.6)}
 .switch input:checked + .track::after{background:var(--green)}
 .deck{background:linear-gradient(180deg,var(--booth),var(--booth-2))}
+
+/* ---- guide ---- */
+.guide-toc{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0 26px}
+.guide-toc a{font-size:13px;font-weight:600;color:var(--chalk-dim);text-decoration:none;background:var(--booth);border:1px solid var(--line);border-radius:99px;padding:7px 15px;transition:all .15s}
+.guide-toc a:hover{color:var(--green);border-color:rgba(0,212,106,.5)}
+.guide-card{background:var(--booth);border:1px solid var(--line);border-radius:var(--radius);padding:24px;margin-bottom:16px;scroll-margin-top:80px}
+.guide-card h2{margin-bottom:10px}
+.guide-card p{color:var(--chalk-dim);margin-bottom:12px;max-width:720px}
+.guide-card p b{color:var(--chalk);font-weight:600}
+.guide-example{display:flex;gap:16px;align-items:flex-start;background:var(--booth-2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.guide-example .rate{flex:none;font-size:14px;margin-top:2px}
+.guide-example p{margin:0;font-size:13.5px}
+.guide-note{border-left:3px solid var(--gold);background:var(--gold-soft);padding:11px 14px;border-radius:0 8px 8px 0;font-size:13px;color:var(--chalk)!important;max-width:none!important}
+.grade-scale{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:14px}
+.grade-scale div{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--chalk-dim)}
+.grade-scale .rate{flex:none;min-width:40px;text-align:center}
+.guide-dl{display:grid;grid-template-columns:1fr;gap:0}
+.guide-dl dt{font-family:var(--disp);font-weight:700;font-size:15px;color:var(--chalk);margin-top:14px;display:flex;align-items:center;gap:8px}
+.guide-dl dt:first-child{margin-top:0}
+.guide-dl dd{color:var(--chalk-dim);font-size:14px;margin:4px 0 0;padding-bottom:12px;border-bottom:1px solid var(--line);max-width:760px}
+.guide-dl dd:last-child{border-bottom:none}
+.guide-hint{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--gold-soft);border:1px solid rgba(255,197,49,.4);border-radius:10px;padding:11px 16px;margin-bottom:16px;flex-wrap:wrap}
+.guide-hint span{font-size:13.5px}
+.guide-hint b{color:var(--gold)}
 </style>
 </head>
 <body>
@@ -340,6 +364,7 @@ nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-v
       <button id="tab-analyzer" onclick="showView('analyzer')">Analyzer</button>
       <button id="tab-games" onclick="showView('games')">Games</button>
       <button id="tab-log" onclick="showView('log')">Bet log</button>
+      <button id="tab-guide" onclick="showView('guide')">Guide</button>
       <button id="tab-setup" onclick="showView('setup')">Setup</button>
     </nav>
   </div>
@@ -349,10 +374,11 @@ nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-v
 
   <!-- ================= PROP BOARD ================= -->
   <section id="view-board" class="view active">
+    <div id="guide-hint-slot"></div>
+    <div id="edge-tape" class="tape"></div>
     <h1>Find the soft number</h1>
     <p class="sub">Pick a week and every game pops up as a card. Open a game's props and each line gets a grade: green means the best price gives you an edge, red means the book has you. Tap any grade for the full breakdown.</p>
 
-    <div id="edge-tape" class="tape"></div>
     <div id="board-key-warning" style="margin-top:18px"></div>
 
     <div class="deck">
@@ -578,6 +604,120 @@ nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-v
     </div>
 
     <div id="log-table"></div>
+  </section>
+
+  <!-- ================= GUIDE ================= -->
+  <section id="view-guide" class="view">
+    <div class="eyebrow">How to read this</div>
+    <h1>What everything means</h1>
+    <p class="sub">EdgeBoard turns a lot of data into one number per bet. Here is what that number is, how it is built, and what every term on the board and in the analyzer actually means. Nothing here is betting advice; it is a key to the tool.</p>
+
+    <div class="guide-toc">
+      <a href="#g-rating">The rating</a>
+      <a href="#g-grades">Letter grades</a>
+      <a href="#g-inputs">Rating inputs</a>
+      <a href="#g-board">Board terms</a>
+      <a href="#g-value">Value signals</a>
+      <a href="#g-log">Tracking terms</a>
+      <a href="#g-odds">Odds basics</a>
+    </div>
+
+    <div class="guide-card" id="g-rating">
+      <h2>The rating: the one number that matters</h2>
+      <p>Every prop gets a single signed percentage, shown for whichever side is stronger. It answers one question: <b>at the best price available, do you have an edge, and how big?</b></p>
+      <div class="guide-example">
+        <span class="rate r-pos2">B+ · O +3.2%</span>
+        <p>Reads as: the <b>Over</b> is the better side, it earns a <b>B+ grade</b>, and the model thinks it wins <b>3.2 percentage points</b> more often than the price implies. Green means the edge is yours.</p>
+      </div>
+      <div class="guide-example">
+        <span class="rate r-neg1">D · U −2.1%</span>
+        <p>Reads as: the Under is the less-bad side but still <b>negative</b>. The book has a 2.1-point edge on you here. Red means pass.</p>
+      </div>
+      <p class="guide-note">The percentage is the model's win probability minus the price's implied probability. A rating past ±15% almost always means stale or mismatched data, so it caps and flags a warning rather than pretending it is real.</p>
+    </div>
+
+    <div class="guide-card" id="g-grades">
+      <h2>Letter grades</h2>
+      <p>The grade is just the rating translated to a report card, so you can scan fast without reading decimals. Bands:</p>
+      <div class="grade-scale">
+        <div><span class="rate r-pos3">A+</span> 6%+ edge</div>
+        <div><span class="rate r-pos3">A</span> 4.5–6%</div>
+        <div><span class="rate r-pos2">A-</span> 3.5–4.5%</div>
+        <div><span class="rate r-pos2">B+</span> 2.5–3.5%</div>
+        <div><span class="rate r-pos1">B</span> 1.5–2.5%</div>
+        <div><span class="rate r-pos1">B-</span> 0.75–1.5%</div>
+        <div><span class="rate r-neu">C</span> roughly even</div>
+        <div><span class="rate r-neg1">D</span> −0.75 to −3%</div>
+        <div><span class="rate r-neg2">F</span> worse than −3%</div>
+      </div>
+      <p class="guide-note">A grade is a screen, not a lock. Even an A+ loses plenty of the time; it just wins often enough that the price is wrong in your favor. The bet log's grade-accuracy table is what proves whether the grades actually hold up over time.</p>
+    </div>
+
+    <div class="guide-card" id="g-inputs">
+      <h2>What feeds the rating</h2>
+      <p>Tap any grade to open its breakdown. These are the pieces it blends:</p>
+      <dl class="guide-dl">
+        <dt>Model projection</dt><dd>EdgeBoard's own predicted number for the stat, from a weighted recent-form and season average, adjusted for the matchup. The "Model over %" is the chance the result clears the line given that projection and the player's game-to-game volatility.</dd>
+        <dt>History</dt><dd>How often the player actually cleared this exact line in past games, weighted toward recent form. The most literal signal: did they do it before?</dd>
+        <dt>Market fair %</dt><dd>The book's own opinion with the juice stripped out. The blend is pulled toward this based on sample size, because the market is usually sharp and thin samples should defer to it.</dd>
+        <dt>Blend</dt><dd>55% model, 45% history, then shrunk toward the market fair %. The market always keeps at least 40% of the say. This blended probability is what the rating is measured against the price.</dd>
+        <dt>Usage</dt><dd>From nflverse: whether the player's recent targets, carries, or pass attempts are trending above or below their season norm. Rising usage nudges the projection up, capped at ±8%.</dd>
+        <dt>Defense</dt><dd>How much the opponent allows in this exact stat versus league average, capped at ±10%. "Stat-specific" means real yardage/receptions allowed; "pts proxy" is the fallback when detailed data is missing.</dd>
+        <dt>Script</dt><dd>Game script from the market's spread and total. Big underdogs throw more, big favorites run more, high totals add volume. Only applies when team props are loaded for the game.</dd>
+        <dt>Weather</dt><dd>Wind, precipitation, and hard cold trim passing and receiving projections for outdoor games. Domes are neutral.</dd>
+        <dt>Consistency</dt><dd>How tight the player's game-to-game range is. A steady producer is a safer edge than a boom-or-bust one at the same rating.</dd>
+      </dl>
+    </div>
+
+    <div class="guide-card" id="g-board">
+      <h2>On the board</h2>
+      <dl class="guide-dl">
+        <dt>Consensus line</dt><dd>The median line across every book posting the prop. The market's agreed-upon number.</dd>
+        <dt>Best over / best under</dt><dd>The most favorable price on each side across all books, with which book has it. Always betting the best available price is free edge.</dd>
+        <dt>No-vig over %</dt><dd>The market's true probability of the over after removing the bookmaker's built-in margin.</dd>
+        <dt>Confidence</dt><dd>High, Medium, or Low, based on how many games of data and how many books back the rating. Low means treat it lightly.</dd>
+        <dt>Drift</dt><dd>Books disagree on the line by a meaningful amount. Where books are slow to move is where soft numbers hide.</dd>
+        <dt>Steam</dt><dd>The line moved sharply since you first loaded it, with an arrow for direction. Often a sign of sharp money.</dd>
+        <dt>Top plays</dt><dd>A ranked leaderboard of the best-rated plays across every loaded game and market at once.</dd>
+        <dt>The ticker</dt><dd>The scrolling strip up top streams your highest edges once games are scored.</dd>
+      </dl>
+    </div>
+
+    <div class="guide-card" id="g-value">
+      <h2>Value signals</h2>
+      <dl class="guide-dl">
+        <dt><span class="pill up" style="font-size:10px">ARB</span> Arbitrage</dt><dd>The best over and best under across different books lock in a guaranteed profit no matter the outcome. Rare and usually small, but risk-free when real.</dd>
+        <dt><span class="pill up" style="font-size:10px">MID</span> Middle</dt><dd>You can bet the over at a low line and the under at a higher one elsewhere; if the result lands between, both win. If not, you lose only the juice.</dd>
+        <dt>Lowest juice</dt><dd>Which book charges the least margin on this prop. Paying 4.5% hold instead of 8% keeps more of every bet over time.</dd>
+        <dt>Alt-line ladder</dt><dd>The same prop priced at every alternate line the book offers, each graded, so you can find which rung is the real value.</dd>
+        <dt>Kelly stake</dt><dd>A recommended bet size as a share of your bankroll, based on your edge. EdgeBoard uses quarter-Kelly, a conservative fraction that protects against the model being slightly wrong.</dd>
+      </dl>
+    </div>
+
+    <div class="guide-card" id="g-log">
+      <h2>Tracking your results</h2>
+      <dl class="guide-dl">
+        <dt>CLV (closing line value)</dt><dd>Whether you got a better number than the line closed at. Consistently beating the close is the earliest, most reliable sign you have a real edge, long before your win rate means anything.</dd>
+        <dt>EV (expected value)</dt><dd>Average profit per $100 staked if the model's probability is right. Positive EV is the whole goal.</dd>
+        <dt>ROI</dt><dd>Total profit divided by total staked across settled bets.</dd>
+        <dt>Grade accuracy</dt><dd>How each grade band has actually performed in your settled bets. This is the honest scoreboard: it tells you whether an "A" really wins like an A.</dd>
+        <dt>Calibration</dt><dd>Whether the model's 60% bets actually win about 60% of the time. A well-calibrated model can be trusted; a miscalibrated one is over- or under-confident.</dd>
+        <dt>Auto-settle</dt><dd>Pulls final box scores to mark your logged bets win, loss, or push automatically.</dd>
+      </dl>
+    </div>
+
+    <div class="guide-card" id="g-odds">
+      <h2>Odds basics</h2>
+      <dl class="guide-dl">
+        <dt>American odds</dt><dd>A minus number (−110) is how much you stake to win $100; a plus number (+150) is how much you win on a $100 stake.</dd>
+        <dt>Implied probability</dt><dd>The win chance baked into a price. −110 implies about 52.4%. That 52.4% is also the breakeven: win more than that and you profit long-term.</dd>
+        <dt>The vig (juice / hold)</dt><dd>The book's built-in margin. It is why both sides of a coin flip are priced at −110 instead of +100, and why beating the market is hard.</dd>
+        <dt>Over / Under</dt><dd>Betting whether the real result finishes above or below the posted line.</dd>
+        <dt>Push</dt><dd>The result lands exactly on the line; the bet refunds.</dd>
+      </dl>
+    </div>
+
+    <p class="dim" style="font-size:12.5px;margin-top:8px">EdgeBoard is a research tool, not betting advice. Every rating is a starting point for your own judgment. 21+ · bet responsibly · 1-800-GAMBLER.</p>
   </section>
 
   <!-- ================= SETUP ================= -->
@@ -1127,6 +1267,17 @@ function tapeShortMkt(k){
     player_rush_attempts:"RUSH ATT", player_receptions:"REC", player_reception_yds:"REC YD" })[k] || "";
 }
 function tapeLastName(name){ const p = String(name).trim().split(" "); return (p[p.length-1] || name).toUpperCase(); }
+function renderGuideHint(){
+  const el = document.getElementById("guide-hint-slot");
+  if (!el) return;
+  if (lsGet("edgeboard_guide_seen") === "1"){ el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="guide-hint">
+    <span>New here? <b>Every rating, grade and term is explained in the Guide.</b></span>
+    <span style="display:flex;gap:8px"><button class="btn small" onclick="showView('guide');dismissGuideHint()">Read the guide</button>
+    <button class="btn ghost small" onclick="dismissGuideHint()">Dismiss</button></span>
+  </div>`;
+}
+function dismissGuideHint(){ lsSet("edgeboard_guide_seen","1"); const el=document.getElementById("guide-hint-slot"); if(el) el.innerHTML=""; }
 function renderTape(){
   const el = document.getElementById("edge-tape");
   if (!el) return;
@@ -1376,7 +1527,7 @@ function renderPlayerPropsHtml(espnId, rows, progress){
     return `
       <h3 style="margin:14px 0 6px">${cfg.label}</h3>
       <div class="table-scroll"><table>
-        <thead><tr><th>Player</th><th>Line</th><th>Best over</th><th>Best under</th><th>Rating</th><th>Conf</th><th></th></tr></thead>
+        <thead><tr><th>Player</th><th title="Consensus line: the median across all books posting this prop">Line</th><th title="Best available Over price across books, and which book has it">Best over</th><th title="Best available Under price across books">Best under</th><th title="Model+history+market blend probability minus the price's implied probability, for the stronger side. Tap a grade for the full breakdown.">Rating</th><th title="High, Medium or Low, based on games of data and number of books">Conf</th><th></th></tr></thead>
         <tbody>
         ${vis.map(r => {
           const did = `d-${espnId}-${mktKey}-${r.player.replace(/[^a-z0-9]/gi,"")}`;
@@ -3480,6 +3631,7 @@ function renderLog(){
 renderChips();
 checkKeyWarning();
 renderTape();
+renderGuideHint();
 renderChecklist();
 populateOpponentSelect();
 populateLogMarketSelect();
