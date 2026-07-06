@@ -349,6 +349,7 @@ nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-v
 .guide-hint{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--gold-soft);border:1px solid rgba(255,197,49,.4);border-radius:10px;padding:11px 16px;margin-bottom:16px;flex-wrap:wrap}
 .guide-hint span{font-size:13.5px}
 .guide-hint b{color:var(--gold)}
+.profile-pill{background:var(--gold-soft);color:var(--gold);border:1px solid rgba(255,197,49,.4);font-size:9.5px}
 </style>
 </head>
 <body>
@@ -619,6 +620,7 @@ nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-v
       <a href="#g-board">Board terms</a>
       <a href="#g-value">Value signals</a>
       <a href="#g-log">Tracking terms</a>
+      <a href="#g-profile">Your edge profile</a>
       <a href="#g-odds">Odds basics</a>
     </div>
 
@@ -703,6 +705,16 @@ nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-v
         <dt>Grade accuracy</dt><dd>How each grade band has actually performed in your settled bets. This is the honest scoreboard: it tells you whether an "A" really wins like an A.</dd>
         <dt>Calibration</dt><dd>Whether the model's 60% bets actually win about 60% of the time. A well-calibrated model can be trusted; a miscalibrated one is over- or under-confident.</dd>
         <dt>Auto-settle</dt><dd>Pulls final box scores to mark your logged bets win, loss, or push automatically.</dd>
+      </dl>
+    </div>
+
+    <div class="guide-card" id="g-profile">
+      <h2>Your edge profile</h2>
+      <p>From 1,975 tracked bets across 2020–2025 (58.0% overall, +8.7% ROI, statistically significant), the site badges plays that match where your edge has historically lived, and cautions where it has not. The badge never changes a rating; it is your own record laid over the model's.</p>
+      <dl class="guide-dl">
+        <dt><span class="pill profile-pill" style="font-size:10px">★ profile</span> Profile pick</dt><dd>A positively rated <b>Under</b> on receptions (116-73, +15.3%), receiving yards (307-216, +9.8%), rush attempts (51-27, +19.7%), or passing yards (100-69, +10.7%) — your proven patterns. Lifetime unders: 486-297 (62.1%, +16.6% ROI). The Top plays panel has a "★ Profile picks" filter for exactly these.</dd>
+        <dt>Where your history says pass</dt><dd>Game-total Overs (18-28, −23.8% ROI) and futures (7-12, −24.8%). Your Over bets in general run barely breakeven (54.2%) while your Unders crush; when in doubt, your data says under.</dd>
+        <dt>Your sharpest habit</dt><dd>You beat the closing line 63% of the time (avg +1.0 pts) on tracked team bets, and your CLV-positive bets won 58.4% vs 47.1% when you didn't beat the close. Keep grabbing early numbers; the steam and drift flags exist to support exactly that.</dd>
       </dl>
     </div>
 
@@ -1262,6 +1274,34 @@ const TEAM_COLORS = {
   NYJ:"#125740", PHI:"#004C54", PIT:"#FFB612", SF:"#AA0000", SEA:"#002244", TB:"#D50A0A",
   TEN:"#4B92DB", WAS:"#5A1414"
 };
+
+/* ============================================================
+   Personal edge profile — derived from 1,975 tracked bets, 2020-2025
+   Strong patterns (statistically significant) get a badge; leaks get a caution.
+   This NEVER changes the rating math; it is context on top of it.
+   ============================================================ */
+const EDGE_PROFILE = {
+  strong: {
+    // market key -> lifetime record on the profitable side (Unders)
+    player_receptions:     { record: "116-73",  roi: "+15.3%" },
+    player_reception_yds:  { record: "307-216", roi: "+9.8%"  },
+    player_rush_attempts:  { record: "51-27",   roi: "+19.7%" },
+    player_pass_yds:       { record: "100-69",  roi: "+10.7%" }
+  },
+  strongSide: "Under",   // unders: 486-297 (62.1%), +16.6% ROI lifetime
+  cautions: {
+    totalsOver: "Your history on game-total Overs: 18-28 (-23.8% ROI). Tread carefully.",
+    futures: "Your futures history: 7-12 (-24.8% ROI)."
+  }
+};
+function fitsProfile(r){
+  return r.rating != null && r.rating > 0 && r.side === EDGE_PROFILE.strongSide && EDGE_PROFILE.strong[r.mktKey];
+}
+function profileBadge(r){
+  if (!fitsProfile(r)) return "";
+  const p = EDGE_PROFILE.strong[r.mktKey];
+  return ` <span class="pill profile-pill" title="Fits your profile: ${EDGE_PROFILE.strongSide}s on this market are ${p.record} (${p.roi} ROI) in your 2020-2025 tracked history">★ profile</span>`;
+}
 function tapeShortMkt(k){
   return ({ player_pass_yds:"PASS YD", player_pass_tds:"PASS TD", player_rush_yds:"RUSH YD",
     player_rush_attempts:"RUSH ATT", player_receptions:"REC", player_reception_yds:"REC YD" })[k] || "";
@@ -1496,14 +1536,13 @@ function renderTeamPropsHtml(team, espnId){
   return `
     <h3 style="margin:14px 0 6px">Team props</h3>
     <div class="table-scroll"><table>
-      <thead><tr><th>Market</th><th>Side</th><th>Line</th><th>Best price</th><th>Fair %</th><th>Rating</th><th>Conf</th><th></th></tr></thead>
+      <thead><tr><th>Market</th><th>Side</th><th>Line</th><th>Best price</th><th>Rating</th><th>Conf</th><th></th></tr></thead>
       <tbody>
       ${team.rated.map(r => `<tr>
         <td class="dim">${MKT_LABEL[r.market] || r.market}</td>
         <td class="player-cell">${escapeHtml(r.label)}</td>
         <td class="num">${r.point != null ? (r.point > 0 && r.market === "spreads" ? "+" : "") + r.point : "—"}</td>
         <td class="num"><span class="${r.best.price > 0 ? "price-up" : ""}">${fmtAmerican(r.best.price)}</span><span class="book-tag">${escapeHtml(r.best.book)}</span></td>
-        <td class="num dim">${r.fair != null ? pct(r.fair) : "—"}</td>
         <td>${rateChipHtml(r.edge, null)}</td>
         <td>${confTag(r.conf)}</td>
         <td>${r.edge != null ? `<button class="btn small" onclick='slipFromTeam(cardModels[currentTeamCardId].team.rated[${team.rated.indexOf(r)}], currentTeamCardId)'>+Slip</button>` : ""}</td>
@@ -1539,7 +1578,7 @@ function renderPlayerPropsHtml(espnId, rows, progress){
             ? injPill
             : (r.rating != null ? rateChipHtml(r.rating, did, r.side) : (r.rated === false ? `<span class="pill">no data</span>` : `<span class="dim mono" style="font-size:11px">…</span>`));
           return `<tr>
-            <td class="player-cell" title="${r.flagged ? "Line drift: " + escapeHtml(r.driftNote) : ""}">${watchStar(r.player)}${escapeHtml(r.player)}${r.injury && r.injury.sev !== "out" ? injPill : ""}${r.flagged ? ` <span class="pill hot" style="font-size:9.5px">drift</span>` : ""}${steam}${r.arb ? ` <span class="pill up" style="font-size:9.5px" title="Best over ${fmtAmerican(r.arb.over.price)} (${escapeHtml(r.arb.over.book)}) + best under ${fmtAmerican(r.arb.under.price)} (${escapeHtml(r.arb.under.book)}) at ${r.arb.point} locks ${pct(r.arb.profit)} either way">ARB ${pct(r.arb.profit)}</span>` : ""}${!r.arb && r.middle ? ` <span class="pill up" style="font-size:9.5px" title="Over ${r.middle.lo} at ${escapeHtml(r.middle.overBook)} + Under ${r.middle.hi} at ${escapeHtml(r.middle.underBook)}: both win if the result lands between">MID ${r.middle.lo}–${r.middle.hi}</span>` : ""}</td>
+            <td class="player-cell" title="${r.flagged ? "Line drift: " + escapeHtml(r.driftNote) : ""}">${watchStar(r.player)}${escapeHtml(r.player)}${r.injury && r.injury.sev !== "out" ? injPill : ""}${r.flagged ? ` <span class="pill hot" style="font-size:9.5px">drift</span>` : ""}${steam}${r.arb ? ` <span class="pill up" style="font-size:9.5px" title="Best over ${fmtAmerican(r.arb.over.price)} (${escapeHtml(r.arb.over.book)}) + best under ${fmtAmerican(r.arb.under.price)} (${escapeHtml(r.arb.under.book)}) at ${r.arb.point} locks ${pct(r.arb.profit)} either way">ARB ${pct(r.arb.profit)}</span>` : ""}${!r.arb && r.middle ? ` <span class="pill up" style="font-size:9.5px" title="Over ${r.middle.lo} at ${escapeHtml(r.middle.overBook)} + Under ${r.middle.hi} at ${escapeHtml(r.middle.underBook)}: both win if the result lands between">MID ${r.middle.lo}–${r.middle.hi}</span>` : ""}${profileBadge(r)}</td>
             <td class="num" title="Range ${r.lo}–${r.hi}">${r.cons}</td>
             <td class="num">${r.bestOver ? `<span class="price-up">${fmtAmerican(r.bestOver.price)}</span> <span class="dim">(${r.bestOver.point})</span><span class="book-tag">${escapeHtml(r.bestOver.book)}</span>` : "—"}</td>
             <td class="num">${r.bestUnder ? `<span class="price-down">${fmtAmerican(r.bestUnder.price)}</span> <span class="dim">(${r.bestUnder.point})</span><span class="book-tag">${escapeHtml(r.bestUnder.book)}</span>` : "—"}</td>
@@ -2322,13 +2361,14 @@ function renderTopPlays(){
   // market filter
   let list = all;
   const f = topPlaysFilter.market;
-  if (f === "team") list = list.filter(p => p.type === "team");
+  if (f === "profile") list = list.filter(p => p.type === "player" && p.ref && fitsProfile(p.ref));
+  else if (f === "team") list = list.filter(p => p.type === "team");
   else if (f === "player") list = list.filter(p => p.type === "player");
   else if (f !== "all") list = list.filter(p => p.market === f);
   const top = list.slice(0, topPlaysFilter.n);
 
   const marketOpts = [
-    ["all","All markets"],["player","Player props"],["team","Team markets"],
+    ["all","All markets"],["profile","★ Profile picks"],["player","Player props"],["team","Team markets"],
     ...Object.entries(TP_MARKET_LABELS),
     ...Object.entries(SITE_CONFIG.markets).map(([k,m]) => [k, m.label])
   ].map(([v,l]) => `<option value="${v}" ${f===v?"selected":""}>${escapeHtml(l)}</option>`).join("");
