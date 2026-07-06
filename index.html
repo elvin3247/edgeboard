@@ -6,41 +6,46 @@
 <title>EdgeBoard · NFL prop research</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Archivo+Narrow:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
    EdgeBoard v2 — night game palette
    ============================================================ */
 :root{
-  --field:#0E1A13;
-  --booth:#152519;
-  --booth-2:#1B2E20;
-  --chalk:#EDF3EC;
-  --chalk-dim:#9DB2A3;
-  --line:rgba(237,243,236,.12);
-  --amber:#FFB020;
-  --amber-soft:rgba(255,176,32,.14);
-  --up:#4FC97E;
-  --up-soft:rgba(79,201,126,.14);
-  --down:#E5484D;
-  --down-soft:rgba(229,72,77,.13);
-  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --field:#0E2038;
+  --booth:#16294A;
+  --booth-2:#1C3A63;
+  --chalk:#F2F6FC;
+  --chalk-dim:#9DB2CE;
+  --line:rgba(242,246,252,.12);
+  --green:#00D46A;
+  --green-soft:rgba(0,212,106,.14);
+  --gold:#FFC531;
+  --gold-soft:rgba(255,197,49,.15);
+  --amber:#FFC531;
+  --amber-soft:rgba(255,197,49,.15);
+  --up:#00D46A;
+  --up-soft:rgba(0,212,106,.14);
+  --down:#FF5964;
+  --down-soft:rgba(255,89,100,.14);
+  --mono:'JetBrains Mono',ui-monospace,monospace;
   --sans:'Inter',system-ui,sans-serif;
-  --disp:'Space Grotesk',var(--sans);
+  --disp:'Archivo',var(--sans);
+  --narrow:'Archivo Narrow',var(--sans);
   --radius:14px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{animation:none!important;transition:none!important}}
-body{background:var(--field);color:var(--chalk);font-family:var(--sans);font-size:15.5px;line-height:1.65;-webkit-font-smoothing:antialiased}
+body{background:linear-gradient(180deg,#1A3560,#0E2038 55%,#0B1A30);background-attachment:fixed;color:var(--chalk);font-family:var(--sans);font-size:15.5px;line-height:1.65;-webkit-font-smoothing:antialiased}
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit}
 a{color:var(--amber)}
-body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:repeating-linear-gradient(to bottom, transparent 0 119px, rgba(237,243,236,.018) 119px 120px)}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:repeating-linear-gradient(to bottom, transparent 0 119px, rgba(242,246,252,.012) 119px 120px)}
 .wrap{position:relative;z-index:1;max-width:1160px;margin:0 auto;padding:0 20px}
 
 /* top bar */
-header{position:sticky;top:0;z-index:50;background:rgba(14,26,19,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header{position:sticky;top:0;z-index:50;background:rgba(11,26,48,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .bar{display:flex;align-items:center;gap:18px;height:60px;flex-wrap:wrap}
 .brand{display:flex;align-items:baseline;gap:9px;text-decoration:none;color:var(--chalk)}
 .brand .mark{font-family:var(--disp);font-weight:700;font-size:21px;letter-spacing:-.01em}
@@ -65,7 +70,7 @@ h3{font-family:var(--disp);font-weight:600;font-size:16px;letter-spacing:0}
 .panel{background:var(--booth);border:1px solid var(--line);border-radius:var(--radius);padding:24px}
 .mono{font-family:var(--mono)}
 .dim{color:var(--chalk-dim)}
-.btn{background:var(--amber);color:#20180a;border:none;border-radius:10px;font-weight:600;font-size:14px;padding:11px 20px;transition:filter .12s,transform .12s}
+.btn{background:var(--green);color:#06371f;border:none;border-radius:10px;font-weight:600;font-size:14px;padding:11px 20px;transition:filter .12s,transform .12s}
 .btn:hover{filter:brightness(1.07)}
 .btn[disabled]{opacity:.45;cursor:default;filter:none}
 .btn.ghost{background:transparent;color:var(--chalk);border:1px solid var(--line)}
@@ -219,7 +224,7 @@ button.rate{cursor:pointer}
 .score-progress span{position:relative;font-family:var(--mono);font-size:11px;color:var(--chalk-dim);line-height:22px;padding-left:10px}
 
 /* slip */
-.slip-fab{position:fixed;right:18px;bottom:18px;z-index:80;background:var(--amber);color:#20180a;border:none;border-radius:99px;font-weight:700;font-size:14px;padding:12px 20px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.slip-fab{position:fixed;right:18px;bottom:18px;z-index:80;background:var(--green);color:#06371f;border:none;border-radius:99px;font-weight:700;font-size:14px;padding:12px 20px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
 .slip-panel{position:fixed;right:18px;bottom:70px;z-index:80;width:min(360px,calc(100vw - 36px));max-height:70vh;overflow-y:auto;background:var(--booth-2);border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.55)}
 .slip-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);font-family:var(--disp);font-weight:600;font-size:16px;letter-spacing:0}
 .slip-leg{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
@@ -279,6 +284,47 @@ button.rate{cursor:pointer}
 .dot.live{background:var(--up);box-shadow:0 0 6px rgba(79,201,126,.8)}
 .gcard-actions .btn{transition:transform .12s}
 .gcard-actions .btn:active{transform:scale(.97)}
+
+/* ============ BROADCAST THEME (Option D) ============ */
+.eyebrow{color:var(--gold)}
+h1{text-transform:uppercase;font-weight:800;letter-spacing:-.01em}
+.btn{background:var(--green);color:#06371f;font-weight:700}
+.btn:hover{filter:brightness(1.06)}
+.btn.ghost{background:transparent;color:var(--chalk);border:1px solid var(--line)}
+.brand .mark em{color:var(--green)}
+nav button.active{color:var(--green);background:var(--green-soft)}
+nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--green)}
+/* calmer bordered segmented control (from B), green active */
+.seg{background:var(--field);border:1px solid var(--line);border-radius:9px;padding:0;overflow:hidden}
+.seg button{border-radius:0;border-right:1px solid var(--line);letter-spacing:0;text-transform:none;font-weight:600;font-family:var(--sans);font-size:13.5px;padding:9px 17px}
+.seg button:last-child{border-right:none}
+.seg button.on{background:var(--green);color:var(--field)}
+.seg button.on::after{display:none}
+/* live edge tape */
+.tape{background:var(--booth-2);border:1px solid var(--line);border-radius:10px;overflow:hidden;white-space:nowrap;padding:10px 0;margin:20px 0 4px}
+.tape-track{display:inline-block;animation:tapeScroll 34s linear infinite;will-change:transform}
+.tape .ti{display:inline-flex;align-items:center;gap:8px;margin:0 22px;font-family:var(--mono);font-size:12.5px}
+.tape .tk{color:var(--chalk-dim)} .tape .gr{color:var(--gold);font-weight:700} .tape .up{color:var(--green)} .tape .dn{color:var(--down)}
+.tape-static{padding:0 22px;font-family:var(--mono);font-size:12.5px;color:var(--chalk-dim)}
+@keyframes tapeScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.tape-track{animation:none}}
+/* broadcast game cards */
+.gcard{padding:0;overflow:hidden}
+.gcard:hover{border-color:rgba(0,212,106,.5)}
+.gcard-top{display:flex;justify-content:space-between;align-items:center;padding:15px 18px;background:var(--booth-2);border-bottom:2px solid var(--green)}
+.gcard-abbr{font-family:var(--disp);font-weight:800;font-size:26px;letter-spacing:-.01em;line-height:1;display:flex;align-items:center;gap:10px}
+.gcard-abbr .at{color:var(--chalk-dim);font-size:15px;font-weight:700}
+.tchip{width:30px;height:5px;border-radius:3px;display:inline-block;flex:none}
+.gcard-live{font-family:var(--disp);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--green);display:flex;align-items:center;gap:6px}
+.gcard-live.off{color:var(--chalk-dim)}
+.gcard-live .dot2{width:7px;height:7px;border-radius:50%;background:currentColor}
+.gcard-inner{padding:16px 18px}
+.gcard-names{font-family:var(--narrow);font-size:12.5px;color:var(--chalk-dim);letter-spacing:.02em}
+.gcard-actions{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+.slip-fab{background:var(--green);color:#06371f}
+.switch input:checked + .track{background:var(--green-soft);border-color:rgba(0,212,106,.6)}
+.switch input:checked + .track::after{background:var(--green)}
+.deck{background:linear-gradient(180deg,var(--booth),var(--booth-2))}
 </style>
 </head>
 <body>
@@ -287,7 +333,6 @@ button.rate{cursor:pointer}
   <div class="wrap bar">
     <a class="brand" href="#" onclick="return false">
       <span class="mark">Edge<em>Board</em></span>
-      <span class="tag">NFL prop research</span>
     </a>
     <nav>
       <button id="tab-board" class="active" onclick="showView('board')">Live board</button>
@@ -304,10 +349,10 @@ button.rate{cursor:pointer}
 
   <!-- ================= PROP BOARD ================= -->
   <section id="view-board" class="view active">
-    <div class="eyebrow">Prop board · The Odds API · ESPN · nflverse · Open-Meteo</div>
     <h1>Find the soft number</h1>
     <p class="sub">Pick a week and every game pops up as a card. Open a game's props and each line gets a grade: green means the best price gives you an edge, red means the book has you. Tap any grade for the full breakdown.</p>
 
+    <div id="edge-tape" class="tape"></div>
     <div id="board-key-warning" style="margin-top:18px"></div>
 
     <div class="deck">
@@ -1024,6 +1069,7 @@ async function loadWeek(){
     await ensureOddsEvents();
     weekGames.forEach(matchOddsEvent);
     renderGameCards();
+    renderTape();
     const matched = weekGames.filter(g => g.oddsId).length;
     weekStatus(`<p class="dim mono" style="font-size:12px;margin:6px 0 14px">${weekGames.length} games · ${matched} with betting lines on the feed${getAutoLoad() ? " · auto-loading props (paid-tier mode)" : ""}</p>`);
     tickChecklist("deploy");
@@ -1068,6 +1114,36 @@ function matchOddsEvent(g){
 }
 
 /* ---------- game cards ---------- */
+const TEAM_COLORS = {
+  ARI:"#97233F", ATL:"#A71930", BAL:"#241773", BUF:"#00338D", CAR:"#0085CA", CHI:"#0B162A",
+  CIN:"#FB4F14", CLE:"#311D00", DAL:"#003594", DEN:"#FB4F14", DET:"#0076B6", GB:"#203731",
+  HOU:"#03202F", IND:"#002C5F", JAX:"#006778", KC:"#E31837", LV:"#000000", LAC:"#0080C6",
+  LAR:"#003594", MIA:"#008E97", MIN:"#4F2683", NE:"#002244", NO:"#D3BC8D", NYG:"#0B2265",
+  NYJ:"#125740", PHI:"#004C54", PIT:"#FFB612", SF:"#AA0000", SEA:"#002244", TB:"#D50A0A",
+  TEN:"#4B92DB", WAS:"#5A1414"
+};
+function tapeShortMkt(k){
+  return ({ player_pass_yds:"PASS YD", player_pass_tds:"PASS TD", player_rush_yds:"RUSH YD",
+    player_rush_attempts:"RUSH ATT", player_receptions:"REC", player_reception_yds:"REC YD" })[k] || "";
+}
+function tapeLastName(name){ const p = String(name).trim().split(" "); return (p[p.length-1] || name).toUpperCase(); }
+function renderTape(){
+  const el = document.getElementById("edge-tape");
+  if (!el) return;
+  const plays = (typeof collectPlays === "function" ? collectPlays() : []).filter(p => p.edge > 0.0075).slice(0, 16);
+  if (!plays.length){
+    el.innerHTML = `<div class="tape-static">Load a week and open a game's props — your top edges stream across here.</div>`;
+    return;
+  }
+  const items = plays.map(p => {
+    const g = gradeFor(p.edge);
+    const label = p.type === "player"
+      ? `${tapeLastName(p.label)} ${p.side === "Under" ? "u" : "o"}${p.line} ${tapeShortMkt(p.market)}`
+      : `${p.label}${p.line != null ? " " + p.line : ""}`;
+    return `<span class="ti"><span class="tk">${escapeHtml(label)}</span> <span class="gr">${g.letter}</span> <span class="up">+${(p.edge*100).toFixed(1)}%</span></span>`;
+  }).join("");
+  el.innerHTML = `<div class="tape-track">${items}${items}</div>`;
+}
 function renderGameCards(){
   document.getElementById("game-cards").innerHTML =
     `<div class="gcards">` + weekGames.map(gameCardHtml).join("") + `</div>`;
@@ -1080,21 +1156,22 @@ function gameCardHtml(g){
     if (propScopes.team)   btns.push(`<button class="btn ghost small" id="bt-team-${g.id}" onclick="loadGameProps('${g.id}','team')">Team props</button>`);
     if (propScopes.player) btns.push(`<button class="btn small" id="bt-player-${g.id}" onclick="loadGameProps('${g.id}','player')">Player props</button>`);
   }
-  const tag = g.oddsId ? `<span class="pill up">lines live</span>` : (g.completed ? `<span class="pill">final</span>` : `<span class="pill">no lines yet</span>`);
   const aAb = (SITE_CONFIG.stadiums[g.away] || {}).abbr || g.away.split(" ").pop().slice(0,3).toUpperCase();
   const hAb = (SITE_CONFIG.stadiums[g.home] || {}).abbr || g.home.split(" ").pop().slice(0,3).toUpperCase();
+  const aCol = TEAM_COLORS[aAb] || "#5a6b82", hCol = TEAM_COLORS[hAb] || "#5a6b82";
+  const liveClass = g.oddsId ? "" : "off";
+  const liveLabel = g.oddsId ? "Live" : (g.completed ? "Final" : "No lines");
   return `
     <div class="gcard" id="gc-${g.id}">
-      <div class="gcard-head">
-        <div>
-          <div class="gcard-abbr">${escapeHtml(aAb)} <span class="at">@</span> ${escapeHtml(hAb)}</div>
-          <div class="gcard-names">${escapeHtml(g.away)} at ${escapeHtml(g.home)}</div>
-          <div class="gcard-meta" style="margin-top:6px"><span class="dot ${g.oddsId ? "live" : ""}"></span>${scoreBit}</div>
-        </div>
-        ${tag}
+      <div class="gcard-top">
+        <div class="gcard-abbr"><span class="tchip" style="background:${aCol}"></span>${escapeHtml(aAb)} <span class="at">@</span> ${escapeHtml(hAb)}<span class="tchip" style="background:${hCol}"></span></div>
+        <div class="gcard-live ${liveClass}"><span class="dot2"></span>${liveLabel}</div>
       </div>
-      <div class="gcard-actions">${btns.join("") || `<span class="dim" style="font-size:12.5px">${g.completed ? "Use the Games tab for the box score." : "Books have not posted this game yet."}</span>`}</div>
-      <div class="gcard-body" id="gb-${g.id}"></div>
+      <div class="gcard-inner">
+        <div class="gcard-names">${escapeHtml(g.away)} at ${escapeHtml(g.home)} · ${scoreBit}</div>
+        <div class="gcard-actions">${btns.join("") || `<span class="dim" style="font-size:12.5px">${g.completed ? "Use the Games tab for the box score." : "Books have not posted this game yet."}</span>`}</div>
+        <div class="gcard-body" id="gb-${g.id}"></div>
+      </div>
     </div>`;
 }
 async function autoLoadAllCards(){
@@ -1231,7 +1308,7 @@ function rateTeamProps(team){
 }
 
 /* ---------- rendering ---------- */
-function rerenderCards(){ Object.keys(cardModels).forEach(id => renderCardBody(id)); renderTopEdges(); renderTopPlays(); }
+function rerenderCards(){ Object.keys(cardModels).forEach(id => renderCardBody(id)); renderTopEdges(); renderTopPlays(); renderTape(); }
 function renderCardBody(espnId, loadingMsg){
   const body = document.getElementById(`gb-${espnId}`);
   if (!body) return;
@@ -1398,6 +1475,7 @@ async function scoreCardPlayers(espnId){
   renderCardBody(espnId);
   renderTopEdges();
   renderTopPlays();
+  renderTape();
 }
 async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
   const cfg = SITE_CONFIG.markets[r.mktKey];
@@ -3123,16 +3201,16 @@ function renderChart(games, line){
     const h = Math.max(2, innerH - (y(g.value) - padT));
     const col = g.value > line ? "var(--up)" : g.value < line ? "var(--down)" : "var(--chalk-dim)";
     bars += `<rect x="${x.toFixed(1)}" y="${y(g.value).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${col}" opacity="0.9"><title>${g.week!=null?"Wk "+g.week:""} ${g.home?"vs":"@"} ${escapeHtml(g.opp)} — ${g.value}</title></rect>`;
-    labels += `<text x="${(x+w/2).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="9" fill="var(--chalk-dim)" font-family="IBM Plex Mono">${g.week!=null?g.week:(i+1)}</text>`;
+    labels += `<text x="${(x+w/2).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="9" fill="var(--chalk-dim)" font-family="JetBrains Mono, monospace">${g.week!=null?g.week:(i+1)}</text>`;
   });
   const lineY = y(line);
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Per game values against the prop line" style="width:100%;height:auto;display:block">
     <line x1="${padL}" y1="${padT+innerH}" x2="${W-padR}" y2="${padT+innerH}" stroke="var(--line)"/>
-    <text x="${padL-6}" y="${(lineY+4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--amber)" font-family="IBM Plex Mono">${line}</text>
+    <text x="${padL-6}" y="${(lineY+4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--amber)" font-family="JetBrains Mono, monospace">${line}</text>
     ${bars}
     <line x1="${padL}" y1="${lineY.toFixed(1)}" x2="${W-padR}" y2="${lineY.toFixed(1)}" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="6 5"/>
     ${labels}
-    <text x="${W/2}" y="${H-0.5}" text-anchor="middle" font-size="8.5" fill="var(--chalk-dim)" font-family="IBM Plex Mono">week</text>
+    <text x="${W/2}" y="${H-0.5}" text-anchor="middle" font-size="8.5" fill="var(--chalk-dim)" font-family="JetBrains Mono, monospace">week</text>
   </svg>`;
 }
 function renderGamelogTable(games, line){
@@ -3401,6 +3479,7 @@ function renderLog(){
    ============================================================ */
 renderChips();
 checkKeyWarning();
+renderTape();
 renderChecklist();
 populateOpponentSelect();
 populateLogMarketSelect();
