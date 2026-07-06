@@ -295,12 +295,7 @@ button.rate{cursor:pointer}
         <select id="wk-week"></select>
       </div>
       <button class="btn" id="btn-load-week" onclick="loadWeek()">Load week</button>
-      <div class="field search-anchor" style="min-width:240px;max-width:340px">
-        <label for="board-search">Find a game or player</label>
-        <input type="text" id="board-search" placeholder="Type a team or player name" autocomplete="off" oninput="boardSearchInput(this)">
-        <div class="search-results" id="board-search-results" style="display:none"></div>
-      </div>
-      <button class="btn ghost" onclick="toggleInjuryPanel()">Injury report</button>
+      <button class="btn ghost" onclick="toggleTopPlays()">Top plays this week</button>
       <div class="field narrow" style="max-width:150px">
         <label for="rate-min">Min rating %</label>
         <input type="number" id="rate-min" step="0.5" value="0" onchange="ratingFilter.min = parseFloat(this.value)||0; rerenderCards();">
@@ -312,7 +307,7 @@ button.rate{cursor:pointer}
     </div>
 
     <div id="week-status"></div>
-    <div id="injury-panel"></div>
+    <div id="top-plays-panel"></div>
     <div id="top-edges"></div>
     <div id="game-cards"></div>
   </section>
@@ -358,6 +353,11 @@ button.rate{cursor:pointer}
     <div class="eyebrow">Historical data · ESPN · defense proxy · projection model</div>
     <h1>Price the player yourself</h1>
     <p class="sub">Search any NFL player, pick a stat and a line, and see how often they actually cleared it. Add an opponent and the model adjusts for defense. Add the book's price and it computes edge and EV. Then walk-forward backtest the model on past games before you trust it.</p>
+
+    <div style="margin-top:16px">
+      <button class="btn ghost" onclick="toggleInjuryPanel()">League injury report</button>
+    </div>
+    <div id="injury-panel" style="margin-top:12px"></div>
 
     <div class="analyzer-grid">
       <div class="panel">
@@ -1179,7 +1179,7 @@ function rateTeamProps(team){
 }
 
 /* ---------- rendering ---------- */
-function rerenderCards(){ Object.keys(cardModels).forEach(id => renderCardBody(id)); renderTopEdges(); }
+function rerenderCards(){ Object.keys(cardModels).forEach(id => renderCardBody(id)); renderTopEdges(); renderTopPlays(); }
 function renderCardBody(espnId, loadingMsg){
   const body = document.getElementById(`gb-${espnId}`);
   if (!body) return;
@@ -1338,13 +1338,14 @@ async function scoreCardPlayers(espnId){
     try { await scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr); }
     catch(e){ r.rated = false; }
     cm.scoreProgress.done++;
-    if (cm.scoreProgress.done % 3 === 0 || cm.scoreProgress.done === rows.length) renderCardBody(espnId);
+    if (cm.scoreProgress.done % 3 === 0 || cm.scoreProgress.done === rows.length){ renderCardBody(espnId); if (topPlaysOpen) renderTopPlays(); }
     await new Promise(res => setTimeout(res, 200));
   }
   cm.player.forEach(r => { if (r.rating == null && r.rated !== true) r.rated = false; });
   cm.scoring = false;
   renderCardBody(espnId);
   renderTopEdges();
+  renderTopPlays();
 }
 async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
   const cfg = SITE_CONFIG.markets[r.mktKey];
@@ -1990,27 +1991,116 @@ async function toggleInjuryPanel(){
 function renderTopEdges(){
   const el = document.getElementById("top-edges");
   if (!el) return;
-  const all = [];
+  const strip = watchlistStripHtml();
+  el.innerHTML = strip ? `<div class="panel" style="margin:0 0 16px;padding:12px 16px">${strip}</div>` : "";
+}
+
+/* ---------- Top plays: best rated plays across all loaded games ---------- */
+let topPlaysOpen = false;
+let topPlaysFilter = { n: 5, market: "all" };
+const TP_MARKET_LABELS = { h2h:"Moneyline", spreads:"Spread", totals:"Game total", team_totals:"Team total" };
+function collectPlays(){
+  const plays = [];
   Object.entries(cardModels).forEach(([gid, cm]) => {
-    (cm.player || []).forEach(r => { if (r.rating != null && r.rating > 0.0075) all.push({ r, gid }); });
+    const g = cm.g;
+    const gameLabel = g ? `${g.away} @ ${g.home}` : gid;
+    if (cm.team && cm.team.rated){
+      cm.team.rated.forEach(rt => {
+        if (rt.edge == null) return;
+        plays.push({ type:"team", gid, game:gameLabel, edge:rt.edge, grade:gradeFor(rt.edge),
+          market:rt.market, marketLabel:TP_MARKET_LABELS[rt.market] || rt.market,
+          label:rt.label, side:null, line:rt.point, price:rt.best.price, book:rt.best.book, conf:rt.conf, ref:rt });
+      });
+    }
+    (cm.player || []).forEach(r => {
+      if (r.rating == null) return;
+      const price = r.side === "Under" && r.bestUnder ? r.bestUnder.price : (r.bestOver ? r.bestOver.price : null);
+      const book = r.side === "Under" && r.bestUnder ? r.bestUnder.book : (r.bestOver ? r.bestOver.book : "");
+      plays.push({ type:"player", gid, game:gameLabel, edge:r.rating, grade:gradeFor(r.rating),
+        market:r.mktKey, marketLabel:SITE_CONFIG.markets[r.mktKey].label,
+        label:r.player, side:r.side, line:r.cons, price, book, conf:r.conf, ref:r });
+    });
   });
-  if (!all.length){ el.innerHTML = ""; return; }
-  all.sort((a,b) => b.r.rating - a.r.rating);
+  plays.sort((a,b) => b.edge - a.edge);
+  return plays;
+}
+function toggleTopPlays(){ topPlaysOpen = !topPlaysOpen; renderTopPlays(); }
+function renderTopPlays(){
+  const el = document.getElementById("top-plays-panel");
+  if (!el) return;
+  if (!topPlaysOpen){ el.innerHTML = ""; return; }
+  const all = collectPlays();
+  const loadedCount = Object.keys(cardModels).filter(id => {
+    const cm = cardModels[id];
+    return (cm.team && cm.team.rated && cm.team.rated.length) || (cm.player && cm.player.length);
+  }).length;
+  const matched = weekGames.filter(g => g.oddsId).length;
+  const scoring = Object.values(cardModels).some(cm => cm.scoring);
+  const est = matched * ((propScopes.team ? 1 : 0) + (propScopes.player ? 1 : 0));
+
+  // market filter
+  let list = all;
+  const f = topPlaysFilter.market;
+  if (f === "team") list = list.filter(p => p.type === "team");
+  else if (f === "player") list = list.filter(p => p.type === "player");
+  else if (f !== "all") list = list.filter(p => p.market === f);
+  const top = list.slice(0, topPlaysFilter.n);
+
+  const marketOpts = [
+    ["all","All markets"],["player","Player props"],["team","Team markets"],
+    ...Object.entries(TP_MARKET_LABELS),
+    ...Object.entries(SITE_CONFIG.markets).map(([k,m]) => [k, m.label])
+  ].map(([v,l]) => `<option value="${v}" ${f===v?"selected":""}>${escapeHtml(l)}</option>`).join("");
+
   el.innerHTML = `
-    <div class="panel" style="margin:0 0 16px;padding:12px 16px">
-      ${watchlistStripHtml()}
-      <h3 style="margin-bottom:8px">Top edges loaded so far</h3>
-      <div class="edge-strip">
-        ${all.slice(0, 8).map(({r, gid}) => {
-          const g = gradeFor(r.rating);
-          return `<button class="edge-card" onclick="scrollToCard('${gid}')">
-            <span class="rate ${g.cls}" style="font-size:13px">${g.letter}</span>
-            <span class="edge-card-name">${escapeHtml(r.player)}</span>
-            <span class="edge-card-sub">${r.side} ${r.cons} ${SITE_CONFIG.markets[r.mktKey].label.toLowerCase()} · ${(r.rating*100).toFixed(1)}%</span>
-          </button>`;
-        }).join("")}
+    <div class="panel" style="margin:0 0 16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <h2 style="margin:0">Top plays this week</h2>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <div class="field" style="margin:0;max-width:180px"><label for="tp-market">Market</label>
+            <select id="tp-market" onchange="topPlaysFilter.market=this.value;renderTopPlays()">${marketOpts}</select></div>
+          <div class="field" style="margin:0;max-width:110px"><label for="tp-n">Show</label>
+            <select id="tp-n" onchange="topPlaysFilter.n=parseInt(this.value);renderTopPlays()">
+              <option value="5" ${topPlaysFilter.n===5?"selected":""}>Top 5</option>
+              <option value="10" ${topPlaysFilter.n===10?"selected":""}>Top 10</option>
+              <option value="25" ${topPlaysFilter.n===25?"selected":""}>Top 25</option>
+            </select></div>
+          <button class="btn ghost small" onclick="toggleTopPlays()" style="height:41px">Close</button>
+        </div>
       </div>
+      <p class="mkt-note" style="margin-bottom:12px">Ranked by rating across ${loadedCount} loaded game${loadedCount===1?"":"s"}.${matched > loadedCount ? ` ${matched - loadedCount} more game${matched-loadedCount===1?"":"s"} have lines you haven't pulled yet.` : ""}${scoring ? " Still scoring; ratings will keep filling in." : ""}</p>
+      ${matched > loadedCount ? `<button class="btn" style="margin-bottom:14px" onclick="loadAndRankAll()">Load & rank all ${matched} games (~${est} credits)</button>` : ""}
+      ${top.length ? `
+      <div class="table-scroll"><table>
+        <thead><tr><th>Grade</th><th>Play</th><th>Market</th><th>Game</th><th>Best price</th><th>Rating</th><th></th></tr></thead>
+        <tbody>
+        ${top.map(p => `<tr>
+          <td><span class="rate ${p.grade.cls}">${p.grade.letter}</span></td>
+          <td class="player-cell">${escapeHtml(p.label)}${p.side ? " " + p.side : ""}${p.line != null ? " " + (p.type==="team" && p.market==="spreads" && p.line>0 ? "+" : "") + p.line : ""}</td>
+          <td class="dim">${escapeHtml(p.marketLabel)}</td>
+          <td class="dim" style="cursor:pointer" onclick="scrollToCard('${p.gid}')" title="Jump to game">${escapeHtml(p.game)}</td>
+          <td class="num">${p.price != null ? `<span class="${p.price>0?"price-up":""}">${fmtAmerican(p.price)}</span><span class="book-tag">${escapeHtml(p.book||"")}</span>` : "—"}</td>
+          <td><span class="rate ${p.grade.cls}">${p.edge>=0?"+":""}${(p.edge*100).toFixed(1)}%</span></td>
+          <td>${p.type==="player"
+            ? `<button class="btn small" onclick='slipFromRow(cardModels["${p.gid}"].player.find(x => x.mktKey==="${p.market}" && x.player===${jsAttr(p.label)}), "${p.gid}")'>+Slip</button>`
+            : `<button class="btn small" onclick='slipFromTeam(cardModels["${p.gid}"].team.rated.find(x => x.market==="${p.market}" && x.label===${jsAttr(p.label)}), "${p.gid}")'>+Slip</button>`}</td>
+        </tr>`).join("")}
+        </tbody>
+      </table></div>` : `<div class="empty" style="padding:24px">No rated plays yet. Load a game's props, or use the button above to load them all.</div>`}
     </div>`;
+}
+async function loadAndRankAll(){
+  const matched = weekGames.filter(g => g.oddsId);
+  if (!matched.length){ return; }
+  const est = matched.length * ((propScopes.team ? 1 : 0) + (propScopes.player ? 1 : 0));
+  if (!confirm(`This loads props for all ${matched.length} games and uses about ${est} Odds API credits. Continue?`)) return;
+  for (const g of matched){
+    const cm = cardModels[g.id];
+    if (propScopes.team && !(cm && cm.team)) await loadGameProps(g.id, "team");
+    if (propScopes.player && !(cm && cm.player)) await loadGameProps(g.id, "player");
+    await new Promise(r => setTimeout(r, 300));
+    renderTopPlays();
+  }
 }
 function scrollToCard(gid){
   const el = document.getElementById("gc-" + gid);
