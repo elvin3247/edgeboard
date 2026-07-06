@@ -217,6 +217,28 @@ button.rate{cursor:pointer}
 .score-progress{position:relative;height:22px;background:var(--booth-2);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:10px 0 4px}
 .score-bar{position:absolute;inset:0 auto 0 0;background:var(--amber-soft);border-right:2px solid var(--amber);transition:width .3s}
 .score-progress span{position:relative;font-family:var(--mono);font-size:11px;color:var(--chalk-dim);line-height:22px;padding-left:10px}
+
+/* slip */
+.slip-fab{position:fixed;right:18px;bottom:18px;z-index:80;background:var(--amber);color:#20180a;border:none;border-radius:99px;font-weight:700;font-size:14px;padding:12px 20px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.slip-panel{position:fixed;right:18px;bottom:70px;z-index:80;width:min(360px,calc(100vw - 36px));max-height:70vh;overflow-y:auto;background:var(--booth-2);border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.55)}
+.slip-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);font-family:var(--disp);font-weight:600;font-size:17px;letter-spacing:.05em;text-transform:uppercase}
+.slip-leg{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.slip-leg-main{font-weight:600;font-size:13.5px}
+.slip-leg-sub{font-family:var(--mono);font-size:11px;color:var(--chalk-dim)}
+.slip-math{padding:12px 14px}
+.slip-stats{display:flex;flex-wrap:wrap;gap:6px 16px;font-family:var(--mono);font-size:12px;color:var(--chalk-dim)}
+.slip-stats b{color:var(--amber);font-weight:600;margin-right:4px}
+/* top edges */
+.edge-strip{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.edge-card{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:3px;background:var(--booth-2);border:1px solid var(--line);border-radius:8px;padding:9px 12px;color:var(--chalk);text-align:left}
+.edge-card:hover{border-color:var(--amber)}
+.edge-card-name{font-weight:600;font-size:13px}
+.edge-card-sub{font-family:var(--mono);font-size:10.5px;color:var(--chalk-dim)}
+/* injury grid */
+.inj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:6px 18px}
+.inj-row{display:flex;align-items:center;gap:9px;font-size:13px;padding:3px 0}
+/* writeup */
+.writeup{font-size:12.5px;color:var(--chalk);background:var(--amber-soft);border-left:3px solid var(--amber);padding:8px 10px;border-radius:0 6px 6px 0;margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -269,6 +291,11 @@ button.rate{cursor:pointer}
         <select id="wk-week"></select>
       </div>
       <button class="btn" id="btn-load-week" onclick="loadWeek()">Load week</button>
+      <div class="field" style="min-width:220px;max-width:320px">
+        <label for="board-search">Find a game or player</label>
+        <input type="text" id="board-search" placeholder="Team filters cards · player + Enter" oninput="filterCards(this.value)" onkeydown="boardSearchKey(event)">
+      </div>
+      <button class="btn ghost" onclick="toggleInjuryPanel()">Injury report</button>
       <div class="field narrow" style="max-width:150px">
         <label for="rate-min">Min rating %</label>
         <input type="number" id="rate-min" step="0.5" value="0" onchange="ratingFilter.min = parseFloat(this.value)||0; rerenderCards();">
@@ -280,6 +307,8 @@ button.rate{cursor:pointer}
     </div>
 
     <div id="week-status"></div>
+    <div id="injury-panel"></div>
+    <div id="top-edges"></div>
     <div id="game-cards"></div>
   </section>
 
@@ -511,6 +540,8 @@ button.rate{cursor:pointer}
   </section>
 
 </main>
+
+<div id="slip-host"></div>
 
 <footer>
   <div class="wrap">
@@ -1125,7 +1156,7 @@ function rateTeamProps(team){
 }
 
 /* ---------- rendering ---------- */
-function rerenderCards(){ Object.keys(cardModels).forEach(id => renderCardBody(id)); }
+function rerenderCards(){ Object.keys(cardModels).forEach(id => renderCardBody(id)); renderTopEdges(); }
 function renderCardBody(espnId, loadingMsg){
   const body = document.getElementById(`gb-${espnId}`);
   if (!body) return;
@@ -1137,7 +1168,7 @@ function renderCardBody(espnId, loadingMsg){
     bits.push(`<div class="loading-row" style="padding:14px"><span class="spinner"></span> ${escapeHtml(loadingMsg || "Working...")}</div>`);
   if (cm.teamError) bits.push(`<div class="note err">Team props: ${escapeHtml(cm.teamError)}</div>`);
   if (cm.playerError) bits.push(`<div class="note err">Player props: ${escapeHtml(cm.playerError)}. Props usually post a few days before kickoff.</div>`);
-  if (cm.team && cm.team.rated && cm.team.rated.length) bits.push(renderTeamPropsHtml(cm.team));
+  if (cm.team && cm.team.rated && cm.team.rated.length) bits.push(renderTeamPropsHtml(cm.team, espnId));
   else if (cm.team && !cm.teamLoading) bits.push(`<div class="panel empty" style="padding:18px">No team markets posted yet.</div>`);
   if (cm.player){
     if (cm.player.length) bits.push(renderPlayerPropsHtml(espnId, cm.player, cm.scoreProgress));
@@ -1155,12 +1186,14 @@ function weatherLineHtml(w){
     ${trim > 0 ? `<span class="pill hot">passing trimmed ${trim}%</span>` : `<span class="pill up">weather neutral</span>`}
   </div>`;
 }
-function renderTeamPropsHtml(team){
+let currentTeamCardId = null;
+function renderTeamPropsHtml(team, espnId){
+  currentTeamCardId = espnId;
   const MKT_LABEL = { h2h:"Moneyline", spreads:"Spread", totals:"Game total", team_totals:"Team total" };
   return `
     <h3 style="margin:14px 0 6px">Team props</h3>
     <div class="table-scroll"><table>
-      <thead><tr><th>Market</th><th>Side</th><th>Line</th><th>Best price</th><th>Fair %</th><th>Rating</th><th>Conf</th></tr></thead>
+      <thead><tr><th>Market</th><th>Side</th><th>Line</th><th>Best price</th><th>Fair %</th><th>Rating</th><th>Conf</th><th></th></tr></thead>
       <tbody>
       ${team.rated.map(r => `<tr>
         <td class="dim">${MKT_LABEL[r.market] || r.market}</td>
@@ -1170,6 +1203,7 @@ function renderTeamPropsHtml(team){
         <td class="num dim">${r.fair != null ? pct(r.fair) : "—"}</td>
         <td>${rateChipHtml(r.edge, null)}</td>
         <td>${confTag(r.conf)}</td>
+        <td>${r.edge != null ? `<button class="btn small" onclick='slipFromTeam(cardModels[currentTeamCardId].team.rated[${team.rated.indexOf(r)}], currentTeamCardId)'>+Slip</button>` : ""}</td>
       </tr>`).join("")}
       </tbody>
     </table></div>
@@ -1210,7 +1244,8 @@ function renderPlayerPropsHtml(espnId, rows, progress){
             <td>${r.conf ? confTag(r.conf) : ""}</td>
             <td style="white-space:nowrap">
               <button class="btn ghost small" onclick='sendToAnalyzer(${jsAttr(r.player)}, "${mktKey}", ${r.cons})'>Analyze</button>
-              <button class="btn ghost small" onclick='quickLog(${jsAttr(r.player)}, "${mktKey}", ${r.cons}, ${r.side === "Under" && r.bestUnder ? r.bestUnder.price : (r.bestOver ? r.bestOver.price : -110)})'>Log</button>
+              <button class="btn ghost small" onclick='quickLog(${jsAttr(r.player)}, "${mktKey}", ${r.cons}, ${r.side === "Under" && r.bestUnder ? r.bestUnder.price : (r.bestOver ? r.bestOver.price : -110)}, ${r.rating != null ? `"${gradeFor(r.rating).letter}"` : "null"})'>Log</button>
+              ${r.rating != null && !(r.injury && r.injury.sev === "out") ? `<button class="btn small" onclick='slipFromRow(cardModels["${espnId}"].player.find(x => x.mktKey === "${mktKey}" && x.player === ${jsAttr(r.player)}), "${espnId}")'>+Slip</button>` : ""}
             </td>
           </tr>
           ${r.rating != null ? `<tr class="detail-row" id="${did}" style="display:none"><td colspan="7">${detailHtml(r)}</td></tr>` : ""}`;
@@ -1225,7 +1260,8 @@ function renderPlayerPropsHtml(espnId, rows, progress){
 function detailHtml(r){
   const d = r.detail || {};
   const fmtP = p => p != null ? pct(p,0) : "—";
-  return `<div class="detail-grid">
+  const w = propWriteup(r);
+  return `${w ? `<div class="writeup">${w}</div>` : ""}<div class="detail-grid">
     <span><b>Model</b> ${fmtP(d.pModel)}${d.proj != null ? ` (proj ${d.proj.toFixed(1)})` : ""}</span>
     <span><b>History</b> ${fmtP(d.pHist)}${d.n != null ? ` (${d.n} games)` : ""}</span>
     <span><b>Market fair</b> ${fmtP(d.pFair)}</span>
@@ -1241,13 +1277,12 @@ function rateChipHtml(edge, detailId, side){
   if (edge == null) return `<span class="pill">—</span>`;
   const p = edge * 100;
   const capped = Math.max(-15, Math.min(15, p));
-  const mag = Math.abs(capped);
-  const cls = mag < 1 ? "r-neu" : (capped > 0 ? (mag >= 6 ? "r-pos3" : mag >= 3 ? "r-pos2" : "r-pos1") : (mag >= 6 ? "r-neg3" : mag >= 3 ? "r-neg2" : "r-neg1"));
-  const txt = `${side ? side.charAt(0) + " " : ""}${capped >= 0 ? "+" : ""}${capped.toFixed(1)}%${Math.abs(p) > 15 ? "+" : ""}`;
+  const g = gradeFor(edge);
+  const txt = `${g.letter} · ${side ? side.charAt(0) + " " : ""}${capped >= 0 ? "+" : ""}${capped.toFixed(1)}%${Math.abs(p) > 15 ? "+" : ""}`;
   const extra = Math.abs(p) > 15 ? ` title="Rating beyond ±15% usually means stale data; verify before trusting it."` : "";
   return detailId
-    ? `<button class="rate ${cls}"${extra} onclick="toggleDetail('${detailId}')">${txt}</button>`
-    : `<span class="rate ${cls}"${extra}>${txt}</span>`;
+    ? `<button class="rate ${g.cls}"${extra} onclick="toggleDetail('${detailId}')">${txt}</button>`
+    : `<span class="rate ${g.cls}"${extra}>${txt}</span>`;
 }
 function confTag(c){
   const cls = c === "High" ? "up" : c === "Low" ? "down" : "";
@@ -1281,6 +1316,7 @@ async function scoreCardPlayers(espnId){
   cm.player.forEach(r => { if (r.rating == null && r.rated !== true) r.rated = false; });
   cm.scoring = false;
   renderCardBody(espnId);
+  renderTopEdges();
 }
 async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
   const cfg = SITE_CONFIG.markets[r.mktKey];
@@ -1335,6 +1371,22 @@ async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
     }
   }
   det.pModel = pModel;
+  // trend, streak, consistency, and matchup rank for the writeup
+  const l10g = games.slice(-10);
+  det.l10 = { h: l10g.filter(x => x.value > r.cons).length, n: l10g.length };
+  let sLen = 0, sSide = null;
+  for (let i = games.length - 1; i >= 0; i--){
+    const side = games[i].value > r.cons ? "Over" : games[i].value < r.cons ? "Under" : null;
+    if (!side){ break; }
+    if (sSide == null){ sSide = side; sLen = 1; }
+    else if (side === sSide) sLen++;
+    else break;
+  }
+  if (sSide) det.streak = { side: sSide, len: sLen };
+  const valsAll = games.map(x => x.value);
+  const mu = mean(valsAll), sdAll = stdev(valsAll);
+  if (mu > 0 && sdAll != null) det.cv = sdAll / mu;
+  if (det.opp) det.defRank = nflvDefenseRank(det.opp, cfg.espn);
   const blend = blendProb(pModel, pHist, r.noVig, n);
   if (blend == null){ r.rated = false; r.detail = det; return; }
   det.pFinal = blend;
@@ -1380,8 +1432,10 @@ function sendToAnalyzer(playerName, mktKey, line){
   input.value = playerName;
   searchPlayers(playerName, true);
 }
-function quickLog(playerName, mktKey, line, odds){
+let pendingGrade = null;
+function quickLog(playerName, mktKey, line, odds, grade){
   showView("log");
+  pendingGrade = grade || null;
   document.getElementById("lf-player").value = playerName;
   document.getElementById("lf-market").value = mktKey;
   document.getElementById("lf-line").value = line;
@@ -1389,6 +1443,255 @@ function quickLog(playerName, mktKey, line, odds){
 }
 function getAutoLoad(){ return lsGet("edgeboard_autoload") === "1"; }
 function setAutoLoad(v){ lsSet("edgeboard_autoload", v ? "1" : "0"); }
+
+/* ============================================================
+   Grades: letter on top of the signed edge
+   ============================================================ */
+function gradeFor(edge){
+  if (edge == null) return null;
+  const e = edge;
+  if (e >= 0.06)   return { letter:"A+", cls:"r-pos3" };
+  if (e >= 0.045)  return { letter:"A",  cls:"r-pos3" };
+  if (e >= 0.035)  return { letter:"A-", cls:"r-pos2" };
+  if (e >= 0.025)  return { letter:"B+", cls:"r-pos2" };
+  if (e >= 0.015)  return { letter:"B",  cls:"r-pos1" };
+  if (e >= 0.0075) return { letter:"B-", cls:"r-pos1" };
+  if (e > -0.0075) return { letter:"C",  cls:"r-neu" };
+  if (e > -0.03)   return { letter:"D",  cls:"r-neg1" };
+  return { letter:"F", cls:"r-neg2" };
+}
+
+/* ============================================================
+   Parlay slip: add legs, delete legs, combined math
+   ============================================================ */
+function getSlip(){ return lsGetJSON("edgeboard_slip", []); }
+function setSlip(s){ lsSetJSON("edgeboard_slip", s); renderSlip(); }
+function addToSlip(leg){
+  const slip = getSlip();
+  if (slip.length >= 12){ alert("Slip is full (12 legs max)."); return; }
+  if (slip.some(l => l.id === leg.id)) { openSlip(); return; }
+  slip.push(leg);
+  setSlip(slip);
+  openSlip();
+}
+function removeLeg(id){ setSlip(getSlip().filter(l => l.id !== id)); }
+function clearSlip(){ setSlip([]); }
+function americanToDecimal(a){ return a > 0 ? 1 + a/100 : 1 + 100/(-a); }
+function decimalToAmerican(d){ return d >= 2 ? Math.round((d-1)*100) : Math.round(-100/(d-1)); }
+function slipMath(slip, stake){
+  if (!slip.length) return null;
+  const dec = slip.reduce((acc, l) => acc * americanToDecimal(l.price), 1);
+  const implied = slip.reduce((acc, l) => acc * impliedProb(l.price), 1);
+  const probs = slip.map(l => l.prob).filter(p => p != null);
+  const modelProb = probs.length === slip.length ? probs.reduce((a,b)=>a*b, 1) : null;
+  const payout = stake * dec;
+  const ev = modelProb != null ? modelProb*(payout - stake) - (1 - modelProb)*stake : null;
+  const games = slip.map(l => l.game).filter(Boolean);
+  const correlated = new Set(games).size < games.length;
+  return { dec, american: decimalToAmerican(dec), implied, modelProb, payout, ev, correlated };
+}
+let slipOpen = false;
+function openSlip(){ slipOpen = true; renderSlip(); }
+function toggleSlip(){ slipOpen = !slipOpen; renderSlip(); }
+function renderSlip(){
+  const host = document.getElementById("slip-host");
+  if (!host) return;
+  const slip = getSlip();
+  const stake = parseFloat((document.getElementById("slip-stake") || {}).value) || 100;
+  if (!slip.length && !slipOpen){ host.innerHTML = ""; return; }
+  const fab = `<button class="slip-fab" onclick="toggleSlip()">Slip${slip.length ? ` · ${slip.length}` : ""}</button>`;
+  if (!slipOpen){ host.innerHTML = fab; return; }
+  const m = slipMath(slip, stake);
+  host.innerHTML = fab + `
+    <div class="slip-panel">
+      <div class="slip-head"><span>Parlay slip</span>
+        <span>${slip.length ? `<button class="btn ghost small" onclick="clearSlip()">Clear</button>` : ""}
+        <button class="btn ghost small" onclick="toggleSlip()">✕</button></span></div>
+      ${slip.length ? slip.map(l => `
+        <div class="slip-leg">
+          <div>
+            <div class="slip-leg-main">${escapeHtml(l.label)}</div>
+            <div class="slip-leg-sub">${escapeHtml(l.sub || "")} · ${fmtAmerican(l.price)}${l.grade ? ` · ${l.grade}` : ""}</div>
+          </div>
+          <button class="btn danger small" onclick="removeLeg('${l.id}')" title="Remove leg">✕</button>
+        </div>`).join("") : `<div class="dim" style="padding:14px;font-size:13px">Empty. Hit +Slip on any rated prop.</div>`}
+      ${m ? `
+      <div class="slip-math">
+        <div class="field" style="margin:0 0 10px;max-width:120px"><label for="slip-stake">Stake $</label>
+          <input type="number" id="slip-stake" value="${stake}" step="5" onchange="renderSlip()"></div>
+        <div class="slip-stats">
+          <span><b>Odds</b> ${fmtAmerican(m.american)}</span>
+          <span><b>Pays</b> $${m.payout.toFixed(0)}</span>
+          <span><b>Book implied</b> ${pct(m.implied)}</span>
+          <span><b>Model</b> ${m.modelProb != null ? pct(m.modelProb) : "n/a"}</span>
+          ${m.ev != null ? `<span class="${m.ev >= 0 ? "gap-pos" : "gap-neg"}"><b>EV</b> ${m.ev >= 0 ? "+" : ""}$${m.ev.toFixed(0)}</span>` : ""}
+        </div>
+        ${m.correlated ? `<div class="note" style="margin-top:8px;font-size:12px">Two or more legs come from the same game. Correlated legs multiply worse than the math above suggests, and most books restrict them.</div>` : ""}
+        ${m.modelProb == null ? `<p class="dim" style="font-size:11.5px;margin-top:6px">Model probability needs every leg rated; unrated legs show book math only.</p>` : ""}
+        <button class="btn" style="width:100%;margin-top:10px" onclick="logSlip()">Log all legs to bet log</button>
+      </div>` : ""}
+    </div>`;
+}
+function logSlip(){
+  const slip = getSlip();
+  if (!slip.length) return;
+  const bets = getBets();
+  slip.forEach(l => {
+    bets.unshift({ id: Date.now() + "" + Math.floor(Math.random()*10000), placed: nowIso(),
+      player: l.player || l.label, market: l.market || "futures", side: l.side || "To win",
+      line: l.line != null ? l.line : null, odds: l.price, stake: 100, book: l.book || "",
+      closing: null, result: null, grade: l.grade || null });
+  });
+  setBets(bets);
+  clearSlip();
+  showView("log");
+}
+function slipFromRow(r, gameId){
+  const price = r.side === "Under" && r.bestUnder ? r.bestUnder.price : (r.bestOver ? r.bestOver.price : null);
+  const book = r.side === "Under" && r.bestUnder ? r.bestUnder.book : (r.bestOver ? r.bestOver.book : "");
+  if (price == null) return;
+  const g = gradeFor(r.rating);
+  const prob = r.detail && r.detail.pFinal != null ? (r.side === "Under" ? 1 - r.detail.pFinal : r.detail.pFinal) : null;
+  addToSlip({ id: `${gameId}|${r.mktKey}|${r.player}`, label: `${r.player} ${r.side} ${r.cons}`,
+    sub: SITE_CONFIG.markets[r.mktKey].label + (book ? " · " + book : ""), player: r.player,
+    market: r.mktKey, side: r.side, line: r.cons, price, book, prob, game: gameId,
+    grade: g ? g.letter : null });
+}
+function slipFromTeam(rt, gameId){
+  const g = gradeFor(rt.edge);
+  addToSlip({ id: `${gameId}|${rt.market}|${rt.label}`, label: rt.label + (rt.point != null ? ` ${rt.point > 0 && rt.market === "spreads" ? "+" : ""}${rt.point}` : ""),
+    sub: (rt.market === "h2h" ? "Moneyline" : rt.market === "spreads" ? "Spread" : rt.market === "totals" ? "Game total" : "Team total") + " · " + rt.best.book,
+    player: rt.label, market: "futures", side: "To win", line: rt.point, price: rt.best.price,
+    book: rt.best.book, prob: rt.fair, game: gameId, grade: g ? g.letter : null });
+}
+
+/* ============================================================
+   Defense rank + prop writeups (plain-English analysis)
+   ============================================================ */
+function nflvDefenseRank(oppAbbr, espnStat){
+  if (!oppAbbr || !nflv.defAllowed) return null;
+  const metric = ESPN_STAT_TO_DEF[espnStat];
+  if (!metric) return null;
+  const rows = Object.entries(nflv.defAllowed)
+    .map(([team, m]) => ({ team, v: m[metric] }))
+    .filter(r => r.v != null)
+    .sort((a,b) => b.v - a.v); // rank 1 = allows the most (most generous)
+  if (rows.length < 8) return null;
+  const key = rows.find(r => abbrMatch(r.team, oppAbbr) || r.team === oppAbbr);
+  if (!key) return null;
+  return { rank: rows.indexOf(key) + 1, of: rows.length };
+}
+function ordinal(n){ const s = ["th","st","nd","rd"], v = n % 100; return n + (s[(v-20)%10] || s[v] || s[0]); }
+function propWriteup(r){
+  const d = r.detail || {};
+  const bits = [];
+  if (d.l10 && d.l10.n >= 5) bits.push(`Cleared ${r.cons} in ${d.l10.h} of the last ${d.l10.n}`);
+  if (d.streak && d.streak.len >= 3) bits.push(`riding a ${d.streak.len}-game ${d.streak.side.toLowerCase()} streak`);
+  if (d.usage != null && d.usage >= 1.03) bits.push(`volume trending up ${((d.usage-1)*100).toFixed(0)}% vs season norm`);
+  else if (d.usage != null && d.usage <= 0.97) bits.push(`volume trending down ${((1-d.usage)*100).toFixed(0)}%`);
+  if (d.defRank){
+    if (d.defRank.rank <= 10) bits.push(`faces the ${ordinal(d.defRank.rank)}-most generous defense in this stat`);
+    else if (d.defRank.rank >= d.defRank.of - 9) bits.push(`faces a top-10 stingy defense in this stat (${ordinal(d.defRank.rank)} of ${d.defRank.of} in yield)`);
+  }
+  if (d.script != null && d.script >= 1.02) bits.push(`game script leans this way (spread ${d.spread > 0 ? "+" : ""}${d.spread}${d.total ? `, total ${d.total}` : ""})`);
+  else if (d.script != null && d.script <= 0.98) bits.push(`game script works against it`);
+  if (d.weather != null && d.weather < 1) bits.push(`weather trims the passing game ${((1-d.weather)*100).toFixed(0)}%`);
+  if (d.cv != null){
+    if (d.cv < 0.35) bits.push(`a steady game-to-game producer`);
+    else if (d.cv > 0.6) bits.push(`a boom-or-bust profile, so size accordingly`);
+  }
+  if (!bits.length) return "";
+  const s = bits.join("; ") + ".";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/* ============================================================
+   Injury report for the loaded week
+   ============================================================ */
+let injPanelOpen = false;
+async function toggleInjuryPanel(){
+  injPanelOpen = !injPanelOpen;
+  const el = document.getElementById("injury-panel");
+  if (!injPanelOpen){ el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading injury designations...</div>`;
+  await ensureInjuries();
+  const teams = new Set();
+  weekGames.forEach(g => { teams.add(g.home); teams.add(g.away); });
+  const rows = Object.entries(injIndex.byName)
+    .map(([name, v]) => ({ name, ...v, sev: injurySeverity(v.status) }))
+    .filter(r => !teams.size || (r.team && teams.has(r.team)));
+  if (!rows.length){
+    el.innerHTML = `<div class="note">No injury designations on the feed for this week's teams${teams.size ? "" : " (load a week first for team filtering)"}. Designations firm up Wednesday through Friday of game week.</div>`;
+    return;
+  }
+  const order = { out: 0, q: 1, note: 2 };
+  rows.sort((a,b) => (order[a.sev] - order[b.sev]) || a.name.localeCompare(b.name));
+  el.innerHTML = `
+    <div class="panel" style="margin:0 0 16px;padding:14px 16px">
+      <h3 style="margin-bottom:8px">Injury report · ${teams.size ? "this week's teams" : "league-wide"}</h3>
+      <div class="inj-grid">
+        ${rows.slice(0, 60).map(r => `
+          <div class="inj-row">
+            <span class="pill ${r.sev === "out" ? "down" : r.sev === "q" ? "hot" : ""}" style="min-width:44px;text-align:center">${r.sev === "out" ? (/reserve|ir/i.test(r.status) ? "IR" : /doubt/i.test(r.status) ? "DBT" : "OUT") : r.sev === "q" ? "Q" : "•"}</span>
+            <span class="player-cell" style="cursor:pointer" onclick='sendToAnalyzer(${jsAttr(r.name)}, "player_reception_yds", "")'>${escapeHtml(r.name)}</span>
+            <span class="dim" style="font-size:12px">${escapeHtml(r.team || "")}${r.note ? " · " + escapeHtml(r.note.slice(0, 60)) : ""}</span>
+          </div>`).join("")}
+      </div>
+      ${rows.length > 60 ? `<p class="dim" style="font-size:12px;margin-top:8px">Showing the 60 most severe of ${rows.length}.</p>` : ""}
+    </div>`;
+}
+
+/* ============================================================
+   Discover: top edges strip + game/player quick search
+   ============================================================ */
+function renderTopEdges(){
+  const el = document.getElementById("top-edges");
+  if (!el) return;
+  const all = [];
+  Object.entries(cardModels).forEach(([gid, cm]) => {
+    (cm.player || []).forEach(r => { if (r.rating != null && r.rating > 0.0075) all.push({ r, gid }); });
+  });
+  if (!all.length){ el.innerHTML = ""; return; }
+  all.sort((a,b) => b.r.rating - a.r.rating);
+  el.innerHTML = `
+    <div class="panel" style="margin:0 0 16px;padding:12px 16px">
+      <h3 style="margin-bottom:8px">Top edges loaded so far</h3>
+      <div class="edge-strip">
+        ${all.slice(0, 8).map(({r, gid}) => {
+          const g = gradeFor(r.rating);
+          return `<button class="edge-card" onclick="scrollToCard('${gid}')">
+            <span class="rate ${g.cls}" style="font-size:13px">${g.letter}</span>
+            <span class="edge-card-name">${escapeHtml(r.player)}</span>
+            <span class="edge-card-sub">${r.side} ${r.cons} ${SITE_CONFIG.markets[r.mktKey].label.toLowerCase()} · ${(r.rating*100).toFixed(1)}%</span>
+          </button>`;
+        }).join("")}
+      </div>
+    </div>`;
+}
+function scrollToCard(gid){
+  const el = document.getElementById("gc-" + gid);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function filterCards(q){
+  q = (q || "").toLowerCase().trim();
+  weekGames.forEach(g => {
+    const el = document.getElementById("gc-" + g.id);
+    if (!el) return;
+    el.style.display = !q || g.home.toLowerCase().includes(q) || g.away.toLowerCase().includes(q) ? "" : "none";
+  });
+}
+function boardSearchKey(e){
+  if (e.key !== "Enter") return;
+  const q = e.target.value.trim();
+  if (!q) return;
+  const teamHit = weekGames.some(g => g.home.toLowerCase().includes(q.toLowerCase()) || g.away.toLowerCase().includes(q.toLowerCase()));
+  if (!teamHit){
+    // treat as a player search: jump to the analyzer
+    showView("analyzer");
+    document.getElementById("player-search").value = q;
+    searchPlayers(q, false);
+  }
+}
 
 /* ============================================================
    Injury reports (ESPN, structured official designations)
@@ -1402,10 +1705,11 @@ async function ensureInjuries(){
     const data = await res.json();
     const byName = {};
     const walk = arr => (arr || []).forEach(team => {
+      const teamName = team.displayName || (team.team && team.team.displayName) || "";
       (team.injuries || []).forEach(it => {
         const name = it.athlete ? (it.athlete.displayName || "") : (it.displayName || "");
         const status = it.status || (it.type && it.type.description) || "";
-        if (name && status) byName[name] = { status, note: it.shortComment || it.longComment || "" };
+        if (name && status) byName[name] = { status, team: teamName, note: it.shortComment || it.longComment || "" };
       });
     });
     walk(data.injuries);
@@ -2470,8 +2774,10 @@ function addBetFromForm(){
     stake: parseFloat(document.getElementById("lf-stake").value) || 100,
     book: document.getElementById("lf-book").value.trim(),
     closing: null,
-    result: null
+    result: null,
+    grade: pendingGrade
   };
+  pendingGrade = null;
   if (!bet.player || isNaN(bet.odds) || (!isFuture && isNaN(bet.line))){
     alert(isFuture ? "Outcome and odds are required." : "Player, line and odds are required.");
     return;
@@ -2523,6 +2829,22 @@ function betPl(b){
   if (b.result === "W") return b.stake * profitPer100(b.odds) / 100;
   return -b.stake;
 }
+
+function gradeRecordHtml(settled){
+  const graded = settled.filter(b => b.grade);
+  if (!graded.length) return "";
+  const rec = {};
+  graded.forEach(b => {
+    const g = b.grade;
+    rec[g] = rec[g] || { w: 0, l: 0 };
+    if (b.result === "W") rec[g].w++;
+    else if (b.result === "L") rec[g].l++;
+  });
+  const order = ["A+","A","A-","B+","B","B-","C","D","F"];
+  const parts = order.filter(g => rec[g]).map(g => `${g} ${rec[g].w}-${rec[g].l}`);
+  if (!parts.length) return "";
+  return `<div class="stat" style="grid-column:1/-1"><div class="k">Grade accuracy (settled bets)</div><div class="v" style="font-size:15px;font-family:var(--mono);font-weight:500;letter-spacing:0">${parts.join(" · ")}</div></div>`;
+}
 function renderLog(){
   const bets = getBets();
   const settled = bets.filter(b => b.result);
@@ -2542,7 +2864,7 @@ function renderLog(){
     <div class="stat"><div class="k">P/L</div><div class="v ${pl>=0?"pos":"neg"}">${pl>=0?"+":""}$${pl.toFixed(0)}</div></div>
     <div class="stat"><div class="k">ROI</div><div class="v ${pl>=0?"pos":"neg"}">${staked ? (pl/staked*100).toFixed(1)+"%" : "—"}</div></div>
     <div class="stat hero"><div class="k">Avg CLV (props, line units)</div><div class="v ${avgClv>0?"pos":avgClv<0?"neg":"amb"}">${avgClv != null ? (avgClv>=0?"+":"")+avgClv.toFixed(2) : "—"}</div></div>
-    <div class="stat"><div class="k">Beat the close</div><div class="v">${clvBeat != null ? pct(clvBeat,0) : "—"}<small> of ${clvObjs.length}</small></div></div>`;
+    <div class="stat"><div class="k">Beat the close</div><div class="v">${clvBeat != null ? pct(clvBeat,0) : "—"}<small> of ${clvObjs.length}</small></div></div>` + gradeRecordHtml(settled);
 
   if (!bets.length){
     document.getElementById("log-table").innerHTML = `<div class="panel empty"><strong>No bets logged yet.</strong><br>Log bets here, from the analyzer ticket, the board's Log buttons, or the futures tab. Before kickoff (or as a futures market moves), come back and enter the closing number so CLV can be tracked.</div>`;
@@ -2550,7 +2872,7 @@ function renderLog(){
   }
   document.getElementById("log-table").innerHTML = `
     <div class="table-scroll"><table>
-      <thead><tr><th>Placed</th><th>Player / outcome</th><th>Market</th><th>Bet</th><th>Odds</th><th>Stake</th><th>Book</th><th>Closing</th><th>CLV</th><th>Result</th><th>P/L</th><th></th></tr></thead>
+      <thead><tr><th>Placed</th><th>Player / outcome</th><th>Market</th><th>Grade</th><th>Bet</th><th>Odds</th><th>Stake</th><th>Book</th><th>Closing</th><th>CLV</th><th>Result</th><th>P/L</th><th></th></tr></thead>
       <tbody>
       ${bets.map(b => {
         const clv = betClv(b);
@@ -2562,6 +2884,7 @@ function renderLog(){
           <td class="dim">${new Date(b.placed).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</td>
           <td class="player-cell">${escapeHtml(b.player)}</td>
           <td>${escapeHtml(mkt)}</td>
+          <td>${b.grade ? `<span class="pill">${escapeHtml(b.grade)}</span>` : "—"}</td>
           <td class="num">${isFuture ? escapeHtml(b.side) : b.side + " " + b.line}</td>
           <td class="num">${fmtAmerican(b.odds)}</td>
           <td class="num">$${b.stake}</td>
@@ -2597,6 +2920,7 @@ populateLogMarketSelect();
 })();
 (function(){ const k = lsGet("edgeboard_odds_key"); if (k) document.getElementById("api-key-input").value = k; })();
 (function(){ const t = document.getElementById("autoload-toggle"); if (t) t.checked = getAutoLoad(); })();
+renderSlip();
 </script>
 </body>
 </html>
