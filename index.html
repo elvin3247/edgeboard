@@ -1536,7 +1536,7 @@ function renderTeamPropsHtml(team, espnId){
   return `
     <h3 style="margin:14px 0 6px">Team props</h3>
     <div class="table-scroll"><table>
-      <thead><tr><th>Market</th><th>Side</th><th>Line</th><th>Best price</th><th>Rating</th><th>Conf</th><th></th></tr></thead>
+      <thead><tr><th>Market</th><th>Side</th><th>Line</th><th>Best price</th><th>Rating</th><th></th></tr></thead>
       <tbody>
       ${team.rated.map(r => `<tr>
         <td class="dim">${MKT_LABEL[r.market] || r.market}</td>
@@ -1544,7 +1544,6 @@ function renderTeamPropsHtml(team, espnId){
         <td class="num">${r.point != null ? (r.point > 0 && r.market === "spreads" ? "+" : "") + r.point : "—"}</td>
         <td class="num"><span class="${r.best.price > 0 ? "price-up" : ""}">${fmtAmerican(r.best.price)}</span><span class="book-tag">${escapeHtml(r.best.book)}</span></td>
         <td>${rateChipHtml(r.edge, null)}</td>
-        <td>${confTag(r.conf)}</td>
         <td>${r.edge != null ? `<button class="btn small" onclick='slipFromTeam(cardModels[currentTeamCardId].team.rated[${team.rated.indexOf(r)}], currentTeamCardId)'>+Slip</button>` : ""}</td>
       </tr>`).join("")}
       </tbody>
