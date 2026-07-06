@@ -239,6 +239,10 @@ button.rate{cursor:pointer}
 .inj-row{display:flex;align-items:center;gap:9px;font-size:13px;padding:3px 0}
 /* writeup */
 .writeup{font-size:12.5px;color:var(--chalk);background:var(--amber-soft);border-left:3px solid var(--amber);padding:8px 10px;border-radius:0 6px 6px 0;margin-bottom:6px}
+
+.star{background:none;border:none;color:var(--chalk-dim);font-size:15px;padding:0 3px;vertical-align:-1px}
+.star.on{color:var(--amber)}
+.search-anchor{position:relative}
 </style>
 </head>
 <body>
@@ -291,9 +295,10 @@ button.rate{cursor:pointer}
         <select id="wk-week"></select>
       </div>
       <button class="btn" id="btn-load-week" onclick="loadWeek()">Load week</button>
-      <div class="field" style="min-width:220px;max-width:320px">
+      <div class="field search-anchor" style="min-width:240px;max-width:340px">
         <label for="board-search">Find a game or player</label>
-        <input type="text" id="board-search" placeholder="Team filters cards · player + Enter" oninput="filterCards(this.value)" onkeydown="boardSearchKey(event)">
+        <input type="text" id="board-search" placeholder="Type a team or player name" autocomplete="off" oninput="boardSearchInput(this)">
+        <div class="search-results" id="board-search-results" style="display:none"></div>
       </div>
       <button class="btn ghost" onclick="toggleInjuryPanel()">Injury report</button>
       <div class="field narrow" style="max-width:150px">
@@ -469,6 +474,11 @@ button.rate{cursor:pointer}
         <div class="field"><label for="lf-book">Book</label><input type="text" id="lf-book" placeholder="DraftKings"></div>
         <div class="field"><button class="btn" style="width:100%" onclick="addBetFromForm()">Add bet</button></div>
       </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center">
+        <button class="btn ghost" id="btn-settle" onclick="autoSettle()">Auto-settle finished bets</button>
+        <button class="btn ghost" onclick="syncClosingFromBoard()">Sync closing lines from loaded board</button>
+        <span class="dim" id="settle-status" style="font-size:12.5px"></span>
+      </div>
     </div>
 
     <div id="log-table"></div>
@@ -520,12 +530,24 @@ button.rate{cursor:pointer}
         <p><strong>Injuries.</strong> Official ESPN injury designations gate every rating. Out, doubtful, IR, PUP or suspended players show a red status pill instead of a rating, since a prop on an unavailable player is dead money. Questionable players keep their rating but are capped at low confidence and tagged with a Q.</p>
         <p><strong>Defense, upgraded.</strong> When usage data is loaded, the defense adjustment is stat-specific: passing yards allowed for passing props, receiving yards or receptions allowed for receiving props, and so on, built from every player's production against that defense, capped at ±10%. Without it, the points-allowed proxy still applies. The detail row shows which source was used.</p>
         <p><strong>Game script and steam.</strong> If team props are loaded for a game, the market's own spread and total nudge player projections: big underdogs lean pass, big favorites lean run, and high totals add volume, capped at ±8% combined. Lines that move meaningfully between your pulls get a steam badge showing direction and size.</p>
+        <div class="field" style="max-width:200px;margin-top:12px">
+          <label for="bankroll-input">Bankroll $ (for Kelly staking)</label>
+          <input type="number" id="bankroll-input" step="50" onchange="setBankroll(this.value)">
+        </div>
         <label style="display:flex;align-items:center;gap:10px;margin:8px 0 0;text-transform:none;font-family:var(--sans);font-size:13.5px;letter-spacing:0;color:var(--chalk)">
           <input type="checkbox" id="autoload-toggle" style="width:16px;height:16px;accent-color:var(--amber)" onchange="setAutoLoad(this.checked)">
           Auto-load props for every game when a week loads (roughly 15 to 30 credits per week view; suited to the paid tier)
         </label>
       </div>
 
+
+      <div class="panel">
+        <h2 style="margin-bottom:12px">Honest roadmap: not built, and why</h2>
+        <p><strong>Public betting percentages.</strong> Bet-vs-money splits and reverse line movement need paid feeds (Action Network tier). The steam badges are the free stand-in.</p>
+        <p><strong>Live in-game props.</strong> Needs real-time infrastructure and burns credits fast. Out of scope for a free static build.</p>
+        <p><strong>Referee tendencies and man/zone matchup charting.</strong> No reliable free structured source. The stat-specific defense splits are the free approximation.</p>
+        <p><strong>True closing-line capture.</strong> The sync button fills closes from whatever board you have loaded. Fully automatic capture at kickoff needs a small Vercel cron job; say the word when you want that built.</p>
+      </div>
       <div class="panel">
         <h2 style="margin-bottom:12px">Data and caches</h2>
         <p>Gamelogs and defense data cache in this browser for 12 hours to keep things fast and stay polite to the free endpoints. Line snapshots persist so the board can show movement.</p>
@@ -772,17 +794,18 @@ async function fetchWeather(homeTeam, kickoffIso){
     const wind = data.hourly.wind_speed_10m[idx];
     const precipProb = data.hourly.precipitation_probability ? data.hourly.precipitation_probability[idx] : null;
     const temp = data.hourly.temperature_2m[idx];
-    return { dome:false, stadium, wind, precipProb, temp, factors: weatherFactors(wind, precipProb) };
+    return { dome:false, stadium, wind, precipProb, temp, factors: weatherFactors(wind, precipProb, temp) };
   } catch(e){
     return { dome:false, stadium, error:true, factors:{pass:1, rush:1}, desc:"Weather unavailable." };
   }
 }
-function weatherFactors(wind, precipProb){
+function weatherFactors(wind, precipProb, temp){
   const m = SITE_CONFIG.model;
   let pass = 1;
   if (wind != null && wind >= 20) pass *= m.windTrim20;
   else if (wind != null && wind >= 15) pass *= m.windTrim15;
   if (precipProb != null && precipProb >= 60) pass *= m.wetTrim;
+  if (temp != null && temp <= 25) pass *= 0.97; // hard cold affects grip and the kicking/passing game
   return { pass, rush: 1 }; // rain slightly favors rush volume but evidence is thin; keep rush neutral
 }
 function renderWeatherBanner(w, home, away, kickoffIso){
@@ -882,7 +905,7 @@ function project(games, opts){
   const def = defenseFactor(opts.oppAbbr);
   let weather = 1;
   if (opts.kind === "pass"){
-    weather = weatherFactors(opts.wind != null ? opts.wind : null, opts.precipProb != null ? opts.precipProb : null).pass;
+    weather = weatherFactors(opts.wind != null ? opts.wind : null, opts.precipProb != null ? opts.precipProb : null, opts.temp != null ? opts.temp : null).pass;
   }
   const proj = base * def.factor * weather * (opts.usageFactor || 1);
   const sd = stdev(vals);
@@ -1236,7 +1259,7 @@ function renderPlayerPropsHtml(espnId, rows, progress){
             ? injPill
             : (r.rating != null ? rateChipHtml(r.rating, did, r.side) : (r.rated === false ? `<span class="pill">no data</span>` : `<span class="dim mono" style="font-size:11px">…</span>`));
           return `<tr>
-            <td class="player-cell" title="${r.flagged ? "Line drift: " + escapeHtml(r.driftNote) : ""}">${escapeHtml(r.player)}${r.injury && r.injury.sev !== "out" ? injPill : ""}${r.flagged ? ` <span class="pill hot" style="font-size:9.5px">drift</span>` : ""}${steam}</td>
+            <td class="player-cell" title="${r.flagged ? "Line drift: " + escapeHtml(r.driftNote) : ""}">${watchStar(r.player)}${escapeHtml(r.player)}${r.injury && r.injury.sev !== "out" ? injPill : ""}${r.flagged ? ` <span class="pill hot" style="font-size:9.5px">drift</span>` : ""}${steam}${r.arb ? ` <span class="pill up" style="font-size:9.5px" title="Best over ${fmtAmerican(r.arb.over.price)} (${escapeHtml(r.arb.over.book)}) + best under ${fmtAmerican(r.arb.under.price)} (${escapeHtml(r.arb.under.book)}) at ${r.arb.point} locks ${pct(r.arb.profit)} either way">ARB ${pct(r.arb.profit)}</span>` : ""}${!r.arb && r.middle ? ` <span class="pill up" style="font-size:9.5px" title="Over ${r.middle.lo} at ${escapeHtml(r.middle.overBook)} + Under ${r.middle.hi} at ${escapeHtml(r.middle.underBook)}: both win if the result lands between">MID ${r.middle.lo}–${r.middle.hi}</span>` : ""}</td>
             <td class="num" title="Range ${r.lo}–${r.hi}">${r.cons}</td>
             <td class="num">${r.bestOver ? `<span class="price-up">${fmtAmerican(r.bestOver.price)}</span> <span class="dim">(${r.bestOver.point})</span><span class="book-tag">${escapeHtml(r.bestOver.book)}</span>` : "—"}</td>
             <td class="num">${r.bestUnder ? `<span class="price-down">${fmtAmerican(r.bestUnder.price)}</span> <span class="dim">(${r.bestUnder.point})</span><span class="book-tag">${escapeHtml(r.bestUnder.book)}</span>` : "—"}</td>
@@ -1244,7 +1267,7 @@ function renderPlayerPropsHtml(espnId, rows, progress){
             <td>${r.conf ? confTag(r.conf) : ""}</td>
             <td style="white-space:nowrap">
               <button class="btn ghost small" onclick='sendToAnalyzer(${jsAttr(r.player)}, "${mktKey}", ${r.cons})'>Analyze</button>
-              <button class="btn ghost small" onclick='quickLog(${jsAttr(r.player)}, "${mktKey}", ${r.cons}, ${r.side === "Under" && r.bestUnder ? r.bestUnder.price : (r.bestOver ? r.bestOver.price : -110)}, ${r.rating != null ? `"${gradeFor(r.rating).letter}"` : "null"})'>Log</button>
+              <button class="btn ghost small" onclick='quickLogRow("${espnId}", "${mktKey}", ${jsAttr(r.player)})'>Log</button>
               ${r.rating != null && !(r.injury && r.injury.sev === "out") ? `<button class="btn small" onclick='slipFromRow(cardModels["${espnId}"].player.find(x => x.mktKey === "${mktKey}" && x.player === ${jsAttr(r.player)}), "${espnId}")'>+Slip</button>` : ""}
             </td>
           </tr>
@@ -1271,7 +1294,11 @@ function detailHtml(r){
     <span><b>Script</b> ${d.script != null ? ((d.script >= 1 ? "+" : "") + ((d.script-1)*100).toFixed(1) + "%" + (d.spread != null ? " · spread " + (d.spread > 0 ? "+" : "") + d.spread : "") + (d.total != null ? " · total " + d.total : "")) : "n/a (load team props)"}</span>
     <span><b>Weather</b> ${d.weather != null && d.weather < 1 ? "−" + ((1-d.weather)*100).toFixed(0) + "%" : "neutral"}</span>
     <span><b>Season</b> ${d.season || "—"}</span>
-  </div>`;
+    ${r.rating != null && d.pFinal != null ? kellyStakeHtml(r.side === "Under" ? 1 - d.pFinal : d.pFinal, r.side === "Under" && r.bestUnder ? r.bestUnder.price : (r.bestOver ? r.bestOver.price : null)) : ""}
+    ${r.lowHold ? `<span><b>Lowest juice</b> ${escapeHtml(r.lowHold.book)} ${pct(r.lowHold.hold)} hold</span>` : ""}
+    ${d.vsSoft && d.vsSoft.n >= 2 && d.vsTough && d.vsTough.n >= 2 ? `<span><b>Splits</b> avg ${d.vsSoft.avg.toFixed(1)} vs generous D (${d.vsSoft.n}g) · ${d.vsTough.avg.toFixed(1)} vs top-10 D (${d.vsTough.n}g)</span>` : ""}
+  </div>
+  ${r.rating != null && r.gameId ? `<div style="margin-top:8px"><button class="btn ghost small" onclick='loadLadder("${r.gameId}", "${r.mktKey}", ${jsAttr(r.player)})'>Price the alt-line ladder (1 credit)</button><div id="lad-${r.gameId}-${r.mktKey}-${r.player.replace(/[^a-z0-9]/gi,"")}"></div></div>` : ""}`;
 }
 function rateChipHtml(edge, detailId, side){
   if (edge == null) return `<span class="pill">—</span>`;
@@ -1305,6 +1332,7 @@ async function scoreCardPlayers(espnId){
   const homeAbbr = (SITE_CONFIG.stadiums[g.home] || {}).abbr;
   const awayAbbr = (SITE_CONFIG.stadiums[g.away] || {}).abbr;
   const rows = cm.player.slice(0, SITE_CONFIG.model.boardScoreCap * 2);
+  rows.forEach(r => { r.gameId = espnId; });
   cm.scoreProgress = { done: 0, total: rows.length };
   for (const r of rows){
     try { await scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr); }
@@ -1361,11 +1389,11 @@ async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
       script = scriptFactor(cfg.kind, spread, cm.script.total);
       det.script = script; det.spread = spread; det.total = cm.script.total;
     }
-    const p = project(games, { oppAbbr: statDef ? null : opp, wind: w ? w.wind : null, precipProb: w ? w.precipProb : null,
+    const p = project(games, { oppAbbr: statDef ? null : opp, wind: w ? w.wind : null, precipProb: w ? w.precipProb : null, temp: w ? w.temp : null,
                                kind: cfg.kind, usageFactor: usage * (statDef ? statDef.factor : 1) * script });
     if (p){
       pModel = projOverProb(p, r.cons);
-      det.proj = p.proj; det.usage = usage; det.opp = opp; det.weather = p.weather;
+      det.proj = p.proj; det.sd = p.sd; det.usage = usage; det.opp = opp; det.weather = p.weather;
       det.def = statDef ? statDef.factor : (p.def ? p.def.factor : null);
       det.defSrc = statDef ? "stat" : "pts";
     }
@@ -1387,6 +1415,17 @@ async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
   const mu = mean(valsAll), sdAll = stdev(valsAll);
   if (mu > 0 && sdAll != null) det.cv = sdAll / mu;
   if (det.opp) det.defRank = nflvDefenseRank(det.opp, cfg.espn);
+  if (nflv.defAllowed){
+    const soft = [], tough = [];
+    games.forEach(x => {
+      const rk = nflvDefenseRank(x.opp, cfg.espn);
+      if (!rk) return;
+      if (rk.rank <= 10) soft.push(x.value);
+      else if (rk.rank >= rk.of - 9) tough.push(x.value);
+    });
+    if (soft.length) det.vsSoft = { avg: mean(soft), n: soft.length };
+    if (tough.length) det.vsTough = { avg: mean(tough), n: tough.length };
+  }
   const blend = blendProb(pModel, pHist, r.noVig, n);
   if (blend == null){ r.rated = false; r.detail = det; return; }
   det.pFinal = blend;
@@ -1432,10 +1471,20 @@ function sendToAnalyzer(playerName, mktKey, line){
   input.value = playerName;
   searchPlayers(playerName, true);
 }
-let pendingGrade = null;
-function quickLog(playerName, mktKey, line, odds, grade){
+let pendingGrade = null, pendingProb = null;
+function quickLogRow(espnId, mktKey, playerName){
+  const cm = cardModels[espnId];
+  const r = cm && (cm.player || []).find(x => x.mktKey === mktKey && x.player === playerName);
+  if (!r) return;
+  const odds = r.side === "Under" && r.bestUnder ? r.bestUnder.price : (r.bestOver ? r.bestOver.price : -110);
+  quickLog(playerName, mktKey, r.cons, odds, r.rating != null ? gradeFor(r.rating).letter : null,
+    r.detail && r.detail.pFinal != null ? (r.side === "Under" ? 1 - r.detail.pFinal : r.detail.pFinal) : null);
+  document.getElementById("lf-side").value = r.side || "Over";
+}
+function quickLog(playerName, mktKey, line, odds, grade, prob){
   showView("log");
   pendingGrade = grade || null;
+  pendingProb = prob != null ? prob : null;
   document.getElementById("lf-player").value = playerName;
   document.getElementById("lf-market").value = mktKey;
   document.getElementById("lf-line").value = line;
@@ -1443,6 +1492,298 @@ function quickLog(playerName, mktKey, line, odds, grade){
 }
 function getAutoLoad(){ return lsGet("edgeboard_autoload") === "1"; }
 function setAutoLoad(v){ lsSet("edgeboard_autoload", v ? "1" : "0"); }
+
+/* ============================================================
+   Bankroll + Kelly staking
+   ============================================================ */
+function getBankroll(){ return parseFloat(lsGet("edgeboard_bankroll")) || 1000; }
+function setBankroll(v){ const n = parseFloat(v); if (n > 0) lsSet("edgeboard_bankroll", String(n)); }
+function kellyFraction(p, price){
+  if (p == null || !price) return null;
+  const b = americanToDecimal(price) - 1;
+  if (b <= 0) return null;
+  const f = p - (1 - p)/b;
+  return f > 0 ? f : 0;
+}
+function kellyStakeHtml(p, price){
+  const f = kellyFraction(p, price);
+  if (f == null) return "";
+  if (f === 0) return `<span><b>Stake</b> pass (no Kelly edge)</span>`;
+  const q = f/4; // quarter Kelly: standard discipline for model uncertainty
+  const amt = getBankroll() * q;
+  return `<span><b>Stake</b> ¼-Kelly ${ (q*100).toFixed(1) }% ($${amt.toFixed(0)} of $${getBankroll().toFixed(0)})</span>`;
+}
+
+/* ============================================================
+   Arb, middle, and hold detection per prop row
+   ============================================================ */
+function detectRowValue(r){
+  // hold: lowest two-way juice among books quoting both sides
+  let lowHold = null;
+  (r.books || []).forEach(b => {
+    if (b.over == null || b.under == null) return;
+    const hold = impliedProb(b.over) + impliedProb(b.under) - 1;
+    if (!lowHold || hold < lowHold.hold) lowHold = { book: b.book, hold };
+  });
+  r.lowHold = lowHold;
+  // arb: at any shared point, best over + best under across books sum under 100%
+  const byPoint = {};
+  (r.books || []).forEach(b => {
+    const k = String(b.point);
+    byPoint[k] = byPoint[k] || { over: null, under: null };
+    if (b.over != null && (!byPoint[k].over || profitPer100(b.over) > profitPer100(byPoint[k].over.price))) byPoint[k].over = { price: b.over, book: b.book };
+    if (b.under != null && (!byPoint[k].under || profitPer100(b.under) > profitPer100(byPoint[k].under.price))) byPoint[k].under = { price: b.under, book: b.book };
+  });
+  r.arb = null;
+  Object.entries(byPoint).forEach(([pt, s]) => {
+    if (!s.over || !s.under) return;
+    const total = impliedProb(s.over.price) + impliedProb(s.under.price);
+    if (total < 1 && (!r.arb || (1 - total) > r.arb.profit)){
+      r.arb = { point: parseFloat(pt), profit: 1 - total, over: s.over, under: s.under };
+    }
+  });
+  // middle: over available at a lower line than an under elsewhere
+  r.middle = null;
+  if (r.lo < r.hi){
+    const overLow = (r.books || []).filter(b => b.point === r.lo && b.over != null)
+      .sort((a,b) => profitPer100(b.over) - profitPer100(a.over))[0];
+    const underHigh = (r.books || []).filter(b => b.point === r.hi && b.under != null)
+      .sort((a,b) => profitPer100(b.under) - profitPer100(a.under))[0];
+    if (overLow && underHigh){
+      r.middle = { lo: r.lo, hi: r.hi, overBook: overLow.book, overPrice: overLow.over,
+                   underBook: underHigh.book, underPrice: underHigh.under };
+    }
+  }
+}
+
+/* ============================================================
+   Alternate-line ladder pricing
+   ============================================================ */
+async function loadLadder(espnId, mktKey, player){
+  const cm = cardModels[espnId];
+  const g = cm && cm.g;
+  const key = getKey();
+  const host = document.getElementById(`lad-${espnId}-${mktKey}-${player.replace(/[^a-z0-9]/gi,"")}`);
+  if (!host || !g || !key) return;
+  const row = (cm.player || []).find(x => x.mktKey === mktKey && x.player === player);
+  if (!row || !row.detail || row.detail.proj == null || row.detail.sd == null){
+    host.innerHTML = `<p class="dim" style="font-size:12px">The ladder needs a rated row with a projection; score the board first.</p>`;
+    return;
+  }
+  host.innerHTML = `<div class="loading-row" style="padding:10px"><span class="spinner"></span> Pulling alternate lines (1 credit)...</div>`;
+  try {
+    const res = await fetch(`${SITE_CONFIG.oddsApiBase}/sports/${g.oddsSportKey || SITE_CONFIG.sportKey}/events/${g.oddsId}/odds?apiKey=${encodeURIComponent(key)}&regions=${SITE_CONFIG.regions}&oddsFormat=american&markets=${mktKey}_alternate`);
+    if (!res.ok) throw new Error(res.status === 422 ? "no alternate market on the feed for this stat" : "HTTP " + res.status);
+    const data = await res.json();
+    const rungs = {};
+    (data.bookmakers || []).forEach(bk => {
+      (bk.markets || []).forEach(mkt => {
+        (mkt.outcomes || []).forEach(o => {
+          if ((o.description || "") !== player || o.name !== "Over" || o.point == null) return;
+          const k = String(o.point);
+          if (!rungs[k] || profitPer100(o.price) > profitPer100(rungs[k].price)) rungs[k] = { point: o.point, price: o.price, book: bk.title };
+        });
+      });
+    });
+    const list = Object.values(rungs).sort((a,b) => a.point - b.point);
+    if (!list.length){ host.innerHTML = `<p class="dim" style="font-size:12px">No alternate rungs posted for this player yet.</p>`; return; }
+    const { proj, sd } = row.detail;
+    host.innerHTML = `
+      <div class="table-scroll" style="margin-top:6px"><table>
+        <thead><tr><th>Alt line</th><th>Best over</th><th>Model over %</th><th>Edge</th></tr></thead>
+        <tbody>
+        ${list.map(rg => {
+          const pOver = 1 - normCdf((rg.point - proj)/sd);
+          const edge = pOver - impliedProb(rg.price);
+          return `<tr>
+            <td class="num">${rg.point}</td>
+            <td class="num"><span class="${rg.price > 0 ? "price-up" : ""}">${fmtAmerican(rg.price)}</span><span class="book-tag">${escapeHtml(rg.book)}</span></td>
+            <td class="num dim">${pct(pOver)}</td>
+            <td>${rateChipHtml(edge, null)}</td>
+          </tr>`;
+        }).join("")}
+        </tbody>
+      </table></div>
+      <p class="dim" style="font-size:11px;margin-top:4px">Model % assumes the same projection distribution as the main line. Big-payout rungs carry heavy vig, so an honest edge here is rarer than the main line.</p>`;
+  } catch(e){
+    host.innerHTML = `<p class="dim" style="font-size:12px">Ladder unavailable: ${escapeHtml(e.message)}.</p>`;
+  }
+}
+
+/* ============================================================
+   Watchlist
+   ============================================================ */
+function getWatch(){ return lsGetJSON("edgeboard_watch", []); }
+function isWatched(name){ return getWatch().includes(name); }
+function toggleWatch(name){
+  let w = getWatch();
+  w = w.includes(name) ? w.filter(x => x !== name) : [...w, name].slice(-30);
+  lsSetJSON("edgeboard_watch", w);
+  rerenderCards();
+}
+function watchStar(name){
+  return `<button class="star ${isWatched(name) ? "on" : ""}" title="${isWatched(name) ? "Remove from" : "Add to"} watchlist" onclick='toggleWatch(${jsAttr(name)})'>${isWatched(name) ? "★" : "☆"}</button>`;
+}
+function watchlistStripHtml(){
+  const w = getWatch();
+  if (!w.length) return "";
+  const found = [];
+  Object.entries(cardModels).forEach(([gid, cm]) => {
+    (cm.player || []).forEach(r => { if (w.includes(r.player) && r.rating != null) found.push({ r, gid }); });
+  });
+  return `<div style="margin-bottom:8px"><span class="pill hot" style="margin-right:8px">Watchlist</span>${
+    w.map(name => {
+      const hit = found.find(f => f.r.player === name);
+      return hit
+        ? `<button class="edge-card" style="display:inline-flex;flex-direction:row;align-items:center;gap:8px;margin:0 6px 6px 0" onclick="scrollToCard('${hit.gid}')"><span class="rate ${gradeFor(hit.r.rating).cls}" style="font-size:11px">${gradeFor(hit.r.rating).letter}</span> ${escapeHtml(name)}</button>`
+        : `<span class="pill" style="margin:0 6px 6px 0">${escapeHtml(name)} · no props loaded</span>`;
+    }).join("")}</div>`;
+}
+
+/* ============================================================
+   Board search dropdown: teams in the week + exact player names
+   ============================================================ */
+let boardSearchTimer = null;
+function boardSearchInput(el){
+  const q = el.value;
+  filterCards(q);
+  clearTimeout(boardSearchTimer);
+  const box = document.getElementById("board-search-results");
+  if (!q || q.trim().length < 2){ if (box) box.style.display = "none"; return; }
+  boardSearchTimer = setTimeout(() => populateBoardSearch(q.trim()), 300);
+}
+async function populateBoardSearch(q){
+  const box = document.getElementById("board-search-results");
+  if (!box) return;
+  box.style.display = "block";
+  const ql = q.toLowerCase();
+  const teamHits = weekGames.filter(g => g.home.toLowerCase().includes(ql) || g.away.toLowerCase().includes(ql)).slice(0, 4);
+  let items = teamHits.map(g =>
+    `<button onclick="scrollToCard('${g.id}'); hideBoardSearch();"><span>${escapeHtml(g.away)} @ ${escapeHtml(g.home)}</span><span class="meta">game</span></button>`);
+  // loaded prop rows matching by player name (instant, no fetch)
+  const rowHits = [];
+  Object.entries(cardModels).forEach(([gid, cm]) => {
+    (cm.player || []).forEach(r => {
+      if (r.player.toLowerCase().includes(ql) && !rowHits.some(x => x.r.player === r.player)) rowHits.push({ r, gid });
+    });
+  });
+  items = items.concat(rowHits.slice(0, 4).map(({r, gid}) =>
+    `<button onclick="scrollToCard('${gid}'); hideBoardSearch();"><span>${escapeHtml(r.player)}</span><span class="meta">on this board${r.rating != null ? " · " + gradeFor(r.rating).letter : ""}</span></button>`));
+  box.innerHTML = items.length ? items.join("") : `<button disabled><span class="spinner"></span>&nbsp; Searching players...</button>`;
+  if (q.length >= 3){
+    try {
+      const players = await espnSearch(q);
+      const extra = players.filter(p => !rowHits.some(x => x.r.player === p.name)).slice(0, 5).map(p =>
+        `<button onclick='hideBoardSearch(); sendToAnalyzer(${jsAttr(p.name)}, "player_reception_yds", "");'>
+           <span>${escapeHtml(p.name)}</span><span class="meta">${escapeHtml(p.team || "analyzer")}</span></button>`);
+      box.innerHTML = (items.concat(extra).join("")) || `<button disabled>No matches for "${escapeHtml(q)}"</button>`;
+    } catch(e){
+      if (!items.length) box.innerHTML = `<button disabled>Player search needs the site deployed.</button>`;
+    }
+  } else if (!items.length){
+    box.innerHTML = `<button disabled>Keep typing for player search (3+ letters)</button>`;
+  }
+}
+function hideBoardSearch(){ const b = document.getElementById("board-search-results"); if (b) b.style.display = "none"; }
+
+/* ============================================================
+   Auto-settle: results engine for logged prop bets
+   ============================================================ */
+async function autoSettle(){
+  const btn = document.getElementById("btn-settle");
+  const status = document.getElementById("settle-status");
+  if (btn) btn.disabled = true;
+  const bets = getBets();
+  const open = bets.filter(b => !b.result && b.market !== "futures" && SITE_CONFIG.markets[b.market]);
+  if (!open.length){ if (status) status.textContent = "No open prop bets to settle."; if (btn) btn.disabled = false; return; }
+  let settled = 0, skipped = 0;
+  for (const b of open){
+    if (status) status.textContent = `Checking ${b.player}...`;
+    try {
+      const pid = await resolvePlayerId(b.player);
+      if (!pid){ skipped++; continue; }
+      const placedD = new Date(b.placed);
+      const season = guessSeason(b.placed);
+      let games = await getGamelog(pid, season, SITE_CONFIG.markets[b.market].espn);
+      // the bet resolves on the first game after it was placed, within 10 days, already completed
+      const game = games.find(x => x.date && x.date >= new Date(placedD.getTime() - 24*3600*1000) &&
+                                    x.date <= new Date(placedD.getTime() + 10*24*3600*1000) &&
+                                    x.date < new Date());
+      if (!game){ skipped++; continue; }
+      const v = game.value;
+      if (v === b.line) b.result = "P";
+      else b.result = ((b.side === "Over") === (v > b.line)) ? "W" : "L";
+      b.settledAuto = true; b.actual = v;
+      settled++;
+    } catch(e){ skipped++; }
+    await new Promise(r => setTimeout(r, 200));
+  }
+  setBets(bets);
+  renderLog();
+  const st = document.getElementById("settle-status");
+  if (st) st.textContent = `Auto-settled ${settled} bet${settled===1?"":"s"}${skipped ? `, ${skipped} skipped (game not final, player inactive, or no gamelog match)` : ""}. Spot-check the results before trusting the record.`;
+  if (btn) btn.disabled = false;
+}
+
+/* ============================================================
+   Calibration: do the model's probabilities hold up?
+   ============================================================ */
+function calibrationHtml(bets){
+  const rows = bets.filter(b => b.result && b.result !== "P" && b.prob != null);
+  if (rows.length < 5) return "";
+  const buckets = [
+    { lo: 0.50, hi: 0.55, label: "50–55%" },
+    { lo: 0.55, hi: 0.60, label: "55–60%" },
+    { lo: 0.60, hi: 1.01, label: "60%+" }
+  ];
+  const cells = buckets.map(bk => {
+    const inB = rows.filter(b => b.prob >= bk.lo && b.prob < bk.hi);
+    if (!inB.length) return null;
+    const wins = inB.filter(b => b.result === "W").length;
+    const predicted = mean(inB.map(b => b.prob));
+    return { label: bk.label, n: inB.length, actual: wins/inB.length, predicted };
+  }).filter(Boolean);
+  if (!cells.length) return "";
+  return `
+    <div class="panel" style="margin-top:16px;padding:14px 16px">
+      <h3 style="margin-bottom:6px">Model calibration</h3>
+      <p class="dim" style="font-size:12.5px;margin-bottom:10px">A calibrated model's 60% bets win about 60% of the time. Wide gaps mean the blend is over- or under-confident; below 20 settled bets this is noise, not signal.</p>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Predicted band</th><th>Bets</th><th>Predicted avg</th><th>Actual win %</th><th>Gap</th></tr></thead>
+        <tbody>
+        ${cells.map(c => {
+          const gap = c.actual - c.predicted;
+          return `<tr>
+            <td>${c.label}</td><td class="num">${c.n}</td>
+            <td class="num dim">${pct(c.predicted)}</td>
+            <td class="num">${pct(c.actual)}</td>
+            <td class="num ${Math.abs(gap) < 0.05 ? "gap-pos" : "gap-neg"}">${gap >= 0 ? "+" : ""}${pct(gap)}</td>
+          </tr>`;
+        }).join("")}
+        </tbody>
+      </table></div>
+    </div>`;
+}
+
+/* ============================================================
+   CLV sync: fill closing lines from the loaded board
+   ============================================================ */
+function syncClosingFromBoard(){
+  const bets = getBets();
+  let filled = 0;
+  bets.forEach(b => {
+    if (b.closing != null || b.market === "futures") return;
+    Object.values(cardModels).forEach(cm => {
+      (cm.player || []).forEach(r => {
+        if (r.player === b.player && r.mktKey === b.market){ b.closing = r.cons; filled++; }
+      });
+    });
+  });
+  setBets(bets);
+  renderLog();
+  const st = document.getElementById("settle-status");
+  if (st) st.textContent = filled ? `Filled ${filled} closing line${filled===1?"":"s"} from the loaded board. Run this as close to kickoff as you can; true automated capture needs a small Vercel cron job, which is a future step.` : "No matches between open bets and the loaded board. Load the relevant game's props first.";
+}
 
 /* ============================================================
    Grades: letter on top of the signed edge
@@ -1525,7 +1866,9 @@ function renderSlip(){
           <span><b>Book implied</b> ${pct(m.implied)}</span>
           <span><b>Model</b> ${m.modelProb != null ? pct(m.modelProb) : "n/a"}</span>
           ${m.ev != null ? `<span class="${m.ev >= 0 ? "gap-pos" : "gap-neg"}"><b>EV</b> ${m.ev >= 0 ? "+" : ""}$${m.ev.toFixed(0)}</span>` : ""}
+          ${m.modelProb != null ? kellyStakeHtml(m.modelProb, m.american) : ""}
         </div>
+        ${m.correlated && m.modelProb != null ? `<p class="dim" style="font-size:11.5px;margin-top:6px">Rough correlated estimate: same-game overs in the passing game tend to move together, so the true win chance likely sits between ${pct(m.modelProb)} and ${pct(Math.min(0.95, m.modelProb*1.15))}.</p>` : ""}
         ${m.correlated ? `<div class="note" style="margin-top:8px;font-size:12px">Two or more legs come from the same game. Correlated legs multiply worse than the math above suggests, and most books restrict them.</div>` : ""}
         ${m.modelProb == null ? `<p class="dim" style="font-size:11.5px;margin-top:6px">Model probability needs every leg rated; unrated legs show book math only.</p>` : ""}
         <button class="btn" style="width:100%;margin-top:10px" onclick="logSlip()">Log all legs to bet log</button>
@@ -1540,7 +1883,7 @@ function logSlip(){
     bets.unshift({ id: Date.now() + "" + Math.floor(Math.random()*10000), placed: nowIso(),
       player: l.player || l.label, market: l.market || "futures", side: l.side || "To win",
       line: l.line != null ? l.line : null, odds: l.price, stake: 100, book: l.book || "",
-      closing: null, result: null, grade: l.grade || null });
+      closing: null, result: null, grade: l.grade || null, prob: l.prob != null ? l.prob : null });
   });
   setBets(bets);
   clearSlip();
@@ -1655,6 +1998,7 @@ function renderTopEdges(){
   all.sort((a,b) => b.r.rating - a.r.rating);
   el.innerHTML = `
     <div class="panel" style="margin:0 0 16px;padding:12px 16px">
+      ${watchlistStripHtml()}
       <h3 style="margin-bottom:8px">Top edges loaded so far</h3>
       <div class="edge-strip">
         ${all.slice(0, 8).map(({r, gid}) => {
@@ -1954,8 +2298,10 @@ function buildBoardModel(data, eventId){
       }
       const snap = recordSnapshots(eventId, mktKey, player, cons);
       const move = snap.open.point != null ? cons - snap.open.point : 0;
-      return { player, mktKey, books, cons, lo, hi, bestOver, bestUnder, noVig, flagged, driftNote,
+      const rowObj = { player, mktKey, books, cons, lo, hi, bestOver, bestUnder, noVig, flagged, driftNote,
                open: snap.open.point, move, proj: null, projProb: null, gap: null };
+      detectRowValue(rowObj);
+      return rowObj;
     });
     out[mktKey].sort((a,b) => (b.flagged - a.flagged) || ((b.hi - b.lo) - (a.hi - a.lo)));
   });
@@ -2422,7 +2768,7 @@ document.getElementById("player-search").addEventListener("input", e => {
   if (q.length < 3){ hideResults(); return; }
   searchTimer = setTimeout(() => searchPlayers(q, false), 300);
 });
-document.addEventListener("click", e => { if (!e.target.closest(".search-wrap")) hideResults(); });
+document.addEventListener("click", e => { if (!e.target.closest(".search-wrap")) hideResults(); if (!e.target.closest(".search-anchor")) hideBoardSearch(); });
 function hideResults(){ document.getElementById("search-results").style.display = "none"; }
 
 async function searchPlayers(q, autoPick){
@@ -2775,9 +3121,10 @@ function addBetFromForm(){
     book: document.getElementById("lf-book").value.trim(),
     closing: null,
     result: null,
-    grade: pendingGrade
+    grade: pendingGrade,
+    prob: pendingProb
   };
-  pendingGrade = null;
+  pendingGrade = null; pendingProb = null;
   if (!bet.player || isNaN(bet.odds) || (!isFuture && isNaN(bet.line))){
     alert(isFuture ? "Outcome and odds are required." : "Player, line and odds are required.");
     return;
@@ -2903,6 +3250,7 @@ function renderLog(){
       }).join("")}
       </tbody>
     </table></div>
+    ` + calibrationHtml(bets) + `
     <p class="dim" style="font-size:12.5px;margin-top:10px">Prop CLV reads in line units against the closing line. Futures CLV reads in probability points against the closing odds; enter the current odds for your outcome whenever you check the market. Positive means you beat the close either way.</p>`;
 }
 
@@ -2919,7 +3267,7 @@ populateLogMarketSelect();
   if (wk) wk.innerHTML = Array.from({length:18},(_,i)=>`<option value="${i+1}"${i===0?" selected":""}>Week ${i+1}</option>`).join("");
 })();
 (function(){ const k = lsGet("edgeboard_odds_key"); if (k) document.getElementById("api-key-input").value = k; })();
-(function(){ const t = document.getElementById("autoload-toggle"); if (t) t.checked = getAutoLoad(); })();
+(function(){ const t = document.getElementById("autoload-toggle"); if (t) t.checked = getAutoLoad(); const bk = document.getElementById("bankroll-input"); if (bk) bk.value = getBankroll(); })();
 renderSlip();
 </script>
 </body>
