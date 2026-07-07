@@ -1608,6 +1608,7 @@ function detailHtml(r){
     <span><b>Market fair</b> ${fmtP(d.pFair)}</span>
     <span><b>Blend</b> ${fmtP(d.pFinal)} on the ${r.side || "over"}</span>
     <span><b>Usage</b> ${d.usage != null ? (d.usage >= 1 ? "+" : "") + ((d.usage-1)*100).toFixed(1) + "%" : "n/a"}</span>
+    ${d.usageDetail ? `<span style="grid-column:1/-1;font-size:11.5px;color:var(--chalk-dim)"><b style="color:var(--chalk)">Volume</b> ${escapeHtml(d.usageDetail)}</span>` : ""}
     <span><b>Defense</b> ${d.def != null ? (d.def >= 1 ? "+" : "") + ((d.def-1)*100).toFixed(1) + "%" + (d.opp ? " vs " + escapeHtml(d.opp) : "") + (d.defSrc === "stat" ? " (stat-specific)" : d.defSrc === "pts" ? " (pts proxy)" : "") : "neutral"}</span>
     <span><b>Script</b> ${d.script != null ? ((d.script >= 1 ? "+" : "") + ((d.script-1)*100).toFixed(1) + "%" + (d.spread != null ? " · spread " + (d.spread > 0 ? "+" : "") + d.spread : "") + (d.total != null ? " · total " + d.total : "")) : "n/a (load team props)"}</span>
     <span><b>Weather</b> ${d.weather != null && d.weather < 1 ? "−" + ((1-d.weather)*100).toFixed(0) + "%" : "neutral"}</span>
@@ -1645,7 +1646,7 @@ async function scoreCardPlayers(espnId){
   cm.scoring = true;
   const g = cm.g;
   const statsSeason = pickStatsSeason(g.date);
-  await Promise.all([loadDefenseData(statsSeason), ensureNflverse(statsSeason), ensureInjuries()]);
+  await Promise.all([loadDefenseData(statsSeason), ensureNflverse(statsSeason), ensureSnaps(statsSeason), ensureInjuries()]);
   cm.script = buildScriptCtx(cm.team);
   const homeAbbr = (SITE_CONFIG.stadiums[g.home] || {}).abbr;
   const awayAbbr = (SITE_CONFIG.stadiums[g.away] || {}).abbr;
@@ -1697,6 +1698,7 @@ async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
     const playerTeamNorm = teamAbbr ? normAbbr(teamAbbr) : null;
     const opp = playerTeamNorm ? (abbrMatch(playerTeamNorm, homeAbbr) ? awayAbbr : abbrMatch(playerTeamNorm, awayAbbr) ? homeAbbr : null) : null;
     const usage = nflvUsageFactor(r.player, cfg.espn);
+    const usageDetail = nflvUsageFactor.lastDetail;
     // defense: stat-specific from nflverse first, points-allowed proxy as fallback
     const statDef = nflvDefenseFactor(opp, cfg.espn);
     const w = cm.weather && !cm.weather.dome ? cm.weather : null;
@@ -1713,7 +1715,7 @@ async function scoreRow(r, cm, statsSeason, homeAbbr, awayAbbr){
                                kind: cfg.kind, usageFactor: usage * (statDef ? statDef.factor : 1) * script });
     if (p){
       pModel = projOverProb(p, r.cons);
-      det.proj = p.proj; det.sd = p.sd; det.usage = usage; det.opp = opp; det.weather = p.weather;
+      det.proj = p.proj; det.sd = p.sd; det.usage = usage; det.usageDetail = usageDetail; det.opp = opp; det.weather = p.weather;
       det.def = statDef ? statDef.factor : (p.def ? p.def.factor : null);
       det.defSrc = statDef ? "stat" : "pts";
     }
@@ -2250,8 +2252,8 @@ function propWriteup(r){
   const bits = [];
   if (d.l10 && d.l10.n >= 5) bits.push(`Cleared ${r.cons} in ${d.l10.h} of the last ${d.l10.n}`);
   if (d.streak && d.streak.len >= 3) bits.push(`riding a ${d.streak.len}-game ${d.streak.side.toLowerCase()} streak`);
-  if (d.usage != null && d.usage >= 1.03) bits.push(`volume trending up ${((d.usage-1)*100).toFixed(0)}% vs season norm`);
-  else if (d.usage != null && d.usage <= 0.97) bits.push(`volume trending down ${((1-d.usage)*100).toFixed(0)}%`);
+  if (d.usage != null && d.usage >= 1.03) bits.push(`role expanding (${d.usageDetail || "volume up " + ((d.usage-1)*100).toFixed(0) + "%"})`);
+  else if (d.usage != null && d.usage <= 0.97) bits.push(`role shrinking (${d.usageDetail || "volume down " + ((1-d.usage)*100).toFixed(0) + "%"})`);
   if (d.defRank){
     if (d.defRank.rank <= 10) bits.push(`faces the ${ordinal(d.defRank.rank)}-most generous defense in this stat`);
     else if (d.defRank.rank >= d.defRank.of - 9) bits.push(`faces a top-10 stingy defense in this stat (${ordinal(d.defRank.rank)} of ${d.defRank.of} in yield)`);
@@ -2547,10 +2549,12 @@ function indexNflverse(csvText){
   const cSt = col("season_type");
   const cTgt = col("targets"), cCar = col("carries"), cAtt = col("attempts");
   const cOpp = col("opponent_team");
+  const cTS = col("target_share"), cAYS = col("air_yards_share");
   const DEF_METRICS = { passing_yards: col("passing_yards"), rushing_yards: col("rushing_yards"),
     receiving_yards: col("receiving_yards"), receptions: col("receptions"), attempts: cAtt, carries: cCar };
   if (cName === -1 || cWeek === -1) return false;
   const byName = {};
+  const nflvTeamCar = {}; // team -> week -> total carries (for carry-share)
   const defAcc = {}; // defTeam -> metric -> { week -> sum }
   for (let i = 1; i < lines.length; i++){
     if (!lines[i]) continue;
@@ -2561,12 +2565,20 @@ function indexNflverse(csvText){
     const wk = parseInt(f[cWeek], 10) || 0;
     const rec = byName[name] = byName[name] || { team: null, weeks: [] };
     rec.team = (cTeam !== -1 && f[cTeam]) || rec.team;
+    const wteam = (cTeam !== -1 && f[cTeam]) || null;
     rec.weeks.push({
       week: wk,
+      team: wteam,
       targets: cTgt !== -1 ? (parseFloat(f[cTgt]) || 0) : null,
       carries: cCar !== -1 ? (parseFloat(f[cCar]) || 0) : null,
-      attempts: cAtt !== -1 ? (parseFloat(f[cAtt]) || 0) : null
+      attempts: cAtt !== -1 ? (parseFloat(f[cAtt]) || 0) : null,
+      ts: cTS !== -1 && f[cTS] !== "" ? (parseFloat(f[cTS]) || 0) : null,
+      ays: cAYS !== -1 && f[cAYS] !== "" ? (parseFloat(f[cAYS]) || 0) : null
     });
+    if (wteam){
+      const twc = nflvTeamCar[wteam] = nflvTeamCar[wteam] || {};
+      twc[wk] = (twc[wk] || 0) + (cCar !== -1 ? (parseFloat(f[cCar]) || 0) : 0);
+    }
     // defense-allowed accumulation: this player's production counts against the opponent
     if (cOpp !== -1 && f[cOpp]){
       const opp = f[cOpp];
@@ -2581,6 +2593,12 @@ function indexNflverse(csvText){
   }
   Object.values(byName).forEach(r => r.weeks.sort((a,b)=>a.week-b.week));
   if (!Object.keys(byName).length) return false;
+  Object.values(byName).forEach(rec => {
+    rec.weeks.forEach(w => {
+      const tw = w.team && nflvTeamCar[w.team] ? nflvTeamCar[w.team][w.week] : null;
+      w.carShare = (tw && w.carries != null) ? (w.carries / tw) : null;
+    });
+  });
   nflv.byName = byName;
   // finalize: per-game allowed averages + league averages
   const defAllowed = {}, leagueSums = {}, leagueCounts = {};
@@ -2634,18 +2652,91 @@ function nflvTeamFor(name){
   const rec = nflv.byName[name];
   return rec ? rec.team : null;
 }
+
+/* ---------- snap counts (nflverse/PFR): offensive snap % per player-week ---------- */
+let snapIdx = { state: "idle", year: null, byName: {} };
+async function ensureSnaps(year){
+  if (snapIdx.state === "ready" && snapIdx.year === year) return true;
+  if (snapIdx.state === "loading") return false;
+  snapIdx.state = "loading";
+  try {
+    const res = await fetch(`https://github.com/nflverse/nflverse-data/releases/download/snap_counts/snap_counts_${year}.csv`);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const text = await res.text();
+    const lines = text.split("\n");
+    const header = parseCsvLine(lines[0]);
+    const cP = header.indexOf("player"), cW = header.indexOf("week"),
+          cPct = header.indexOf("offense_pct"), cGt = header.indexOf("game_type");
+    if (cP === -1 || cW === -1 || cPct === -1) throw new Error("columns missing");
+    const byName = {};
+    for (let i = 1; i < lines.length; i++){
+      if (!lines[i]) continue;
+      const f = parseCsvLine(lines[i]);
+      if (cGt !== -1 && f[cGt] && f[cGt] !== "REG") continue;
+      const name = f[cP]; if (!name) continue;
+      const pct = parseFloat(f[cPct]);
+      if (isNaN(pct)) continue;
+      (byName[name] = byName[name] || []).push({ week: parseInt(f[cW],10)||0, pct: pct <= 1 ? pct*100 : pct });
+    }
+    Object.values(byName).forEach(a => a.sort((x,y) => x.week - y.week));
+    snapIdx = { state: "ready", year, byName };
+    return true;
+  } catch(e){ snapIdx = { state: "error", year, byName: {} }; return false; }
+}
+function snapTrend(name){
+  const a = snapIdx.byName[name];
+  if (!a || a.length < 4) return null;
+  const season = mean(a.map(x => x.pct));
+  const recent = mean(a.slice(-3).map(x => x.pct));
+  if (!season) return null;
+  return { recent, season, delta: recent/season - 1 };
+}
+function trendOf(rec, field){
+  const vals = rec.weeks.map(w => w[field]).filter(v => v != null);
+  if (vals.length < 4) return null;
+  const season = mean(vals);
+  if (!season) return null;
+  const recent = mean(vals.slice(-3));
+  return { recent, season, delta: recent/season - 1 };
+}
 function nflvUsageFactor(name, espnStat){
+  nflvUsageFactor.lastDetail = "";
   const rec = nflv.byName[name];
   if (!rec || rec.weeks.length < 4) return 1;
-  const metric = /pass|complet|intercept/i.test(espnStat) ? "attempts"
-    : /rush/i.test(espnStat) ? "carries" : "targets";
-  const vals = rec.weeks.map(w => w[metric]).filter(v => v != null);
-  if (vals.length < 4) return 1;
-  const seasonAvg = mean(vals);
-  const recentAvg = mean(vals.slice(-3));
-  if (!seasonAvg) return 1;
-  return clamp(1 + 0.4 * (recentAvg/seasonAvg - 1), 0.92, 1.08);
+  const isPass = /pass|complet|intercept/i.test(espnStat);
+  const isRush = /rush/i.test(espnStat);
+  const parts = [];
+  let delta = null;
+  if (isPass){
+    const att = trendOf(rec, "attempts");
+    if (att){ delta = att.delta; parts.push(`attempts ${att.recent.toFixed(1)}/gm (szn ${att.season.toFixed(1)})`); }
+  } else if (isRush){
+    const cs = trendOf(rec, "carShare"), car = trendOf(rec, "carries");
+    if (cs && car){ delta = 0.6*cs.delta + 0.4*car.delta;
+      parts.push(`carry share ${(cs.recent*100).toFixed(0)}% (szn ${(cs.season*100).toFixed(0)}%)`); }
+    else if (car){ delta = car.delta; parts.push(`carries ${car.recent.toFixed(1)}/gm`); }
+  } else {
+    const ts = trendOf(rec, "ts"), tgt = trendOf(rec, "targets");
+    if (ts && tgt){ delta = 0.6*ts.delta + 0.4*tgt.delta;
+      parts.push(`target share ${(ts.recent*100).toFixed(0)}% (szn ${(ts.season*100).toFixed(0)}%)`); }
+    else if (tgt){ delta = tgt.delta; parts.push(`targets ${tgt.recent.toFixed(1)}/gm`); }
+    if (/yard|yds/i.test(espnStat)){
+      const ays = trendOf(rec, "ays");
+      if (ays && delta != null){ delta = 0.75*delta + 0.25*ays.delta;
+        parts.push(`air-yards share ${(ays.recent*100).toFixed(0)}%`); }
+    }
+  }
+  if (delta == null) return 1;
+  let usage = clamp(1 + 0.5 * delta, 0.92, 1.08);
+  const st = snapTrend(name);
+  if (st && !isPass){
+    usage = clamp(usage * clamp(1 + 0.3*st.delta, 0.96, 1.04), 0.92, 1.08);
+    parts.push(`snaps ${st.recent.toFixed(0)}% (szn ${st.season.toFixed(0)}%)`);
+  }
+  nflvUsageFactor.lastDetail = parts.join(" · ");
+  return usage;
 }
+nflvUsageFactor.lastDetail = "";
 
 /* line snapshots (step 8) */
 function snapKey(eventId, mkt, player){ return `${eventId}|${mkt}|${player}`; }
